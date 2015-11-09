@@ -1,7 +1,10 @@
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 
 import javax.swing.SpringLayout.Constraints;
 
@@ -330,7 +333,7 @@ public class Neat {
 		if(forceBias)
 			newLink.into = Inputs;
 		
-		if(genome.genes.contains(newLink))
+		if(genome.genes.contains(newLink)) //TODO test if we need custom contains method
 			return;
 		
 		newLink.innovation = pool.newInnovation();
@@ -375,6 +378,67 @@ public class Neat {
 		Gene gene = candidates.get(random.nextInt(candidates.size())); //TODO maybe off by one error, must test
 		gene.enabled = !gene.enabled;
 	}
+	
+	public double disjoint(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
+		int disjointGenes = 0;
+		for(int i=0; i<genes1.size(); i++) 
+			if(!genes2.contains(genes1.get(i)))  // may need custom contains
+				disjointGenes++;
+			
+		for(int i=0; i<genes2.size(); i++) 
+			if(!genes1.contains(genes2.get(i)))
+				disjointGenes++;
+		
+		int n = Math.max(genes1.size(), genes2.size());
+		
+		return disjointGenes / n;
+	}
+	
+	public double weights(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
+		ArrayList<Gene> genes = new ArrayList<Gene>();
+		ArrayList<Integer> indexes = new ArrayList<Integer>();
+		
+		for(int i=0; i<genes2.size(); i++) {
+			Gene gene = genes2.get(i);
+			genes.add(gene);
+			indexes.add(gene.innovation);
+		}
+		
+		double sum = 0;
+		int coincident = 0;
+		for(int i=0; i<genes1.size();i++) {
+			Gene gene = genes1.get(i);
+			if(indexes.contains(gene.innovation)) {
+				Gene gene2 = genes.get(indexes.indexOf(gene.innovation));
+				sum += Math.abs(gene.weight - gene2.weight);
+				coincident++;
+			}
+		}
+		
+		return sum / coincident;
+	}
+	
+	public boolean sameSpecies(Genome genome1, Genome genome2) {
+		double dd = DeltaDisjoint*disjoint(genome1.genes, genome2.genes);
+		double dw = DeltaWeights*weights(genome1.genes, genome2.genes);
+		return dd + dw < DeltaThreshold;
+	}
+	
+	public void rankGlobally() {
+		ArrayList<Genome> global = new ArrayList<>();
+		for(int s=0; s<pool.species.size(); s++) {
+			Species species = pool.species.get(s);
+			for(int g=0; g<species.genomes.size(); g++)
+				global.add(species.genomes.get(g));
+		}
+		
+		Collections.sort(global);
+		
+		for(int g=0; g<global.size(); g++) 
+			global.get(g).globalRank = g;
+	}
+	
+	
 	
 	///////////////////////////////////////////////////////////////
 	public class Network{
@@ -436,13 +500,23 @@ public class Neat {
 		int topFitness = 0;
 		int staleness = 0;
 		int averageFitness = 0;
+		
+		public void calculateAverageFitness() {
+			int total = 0; 
+			for(int g=0; g<genomes.size(); g++) {
+				Genome genome = genomes.get(g);
+				total += genome.globalRank;
+			}
+			averageFitness = total / genomes.size();
+		}
 	}
-	public class Genome{
+	public class Genome implements Comparable{
 		ArrayList<Gene> genes = new ArrayList<Gene>();
 		Network network;
 		int fitness = 0;
 		int adjustedFitness = 0;
 		int averageFitness = 0;
+		int globalRank = 0;
 		
 		double connections = MutateConnectionsChance;
 		double link = LinkMutationChance;
@@ -478,6 +552,13 @@ public class Neat {
 		public void sort()
 		{
 			Collections.sort(genes);
+		}
+		
+		@Override
+		public int compareTo(Object other) {
+			double otherFitness = ((Genome)other).fitness;
+			
+			return Double.compare(this.fitness, otherFitness);
 		}
 	}
 	public class Gene implements Comparable{
