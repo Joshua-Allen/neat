@@ -3,11 +3,18 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
 
+import javax.swing.SpringLayout.Constraints;
+
 @SuppressWarnings("all")
 public class Neat {
 	Controller controller;
 	
-	String[] ButtonNames = { "A", "B", "Up", "Down", "Left", "Right",};
+	String[] ButtonNames = { "A", "B", "Up", "Down", "Left", "Right"};
+	
+	Random random; //needed through project, especially in mutate methods
+	Pool pool; //needed in nodeMutate method to access the newInnovation method
+	int Inputs = 0; // TODO value should not be 0. needed in linkMutate and randomNeuron methods
+	int Outputs = 0; // TODO value should not be 0. needed in randomNeuron method at least
 	
 	int Population = 300;
 	double DeltaDisjoint = 2.0;
@@ -93,7 +100,7 @@ public class Neat {
 	{
 		Genome genome = new Genome();
 		
-		genome.maxneuron = 5.0;
+		genome.maxneuron = 5;
 		
 		return genome;
 	}
@@ -199,13 +206,47 @@ public class Neat {
 	
 	///////////////////////////////////////////////////////////////
 	// Added for mutate methods
-	// TODO need to do
-	public Neuron randomNeuron(ArrayList<Gene> genes, boolean bool) {
-		return null;
+	public int randomNeuron(ArrayList<Gene> genes, boolean nonInput) {
+		/* I have changed my mind, look below for alternate code
+		Boolean[] neurons = new Boolean[1000];
+		for(Boolean i : neurons)
+			i = null;
+			
+		if(!nonInput) 
+			for(int i=0; i<Inputs; i++) 
+				neurons[i] = new Boolean(true);
+		for(int o=0; o<Outputs; o++)
+			neurons[MaxNodes+o] = new Boolean(true);
+		for(int i=0; i<genes.size(); i++) {
+			if(!nonInput || genes.get(i).into > Inputs)
+				neurons[genes.get(i).into] = new Boolean(true);
+			if(!nonInput || genes.get(i).out > Inputs)
+				neurons[genes.get(i).out] = new Boolean(true);
+		}
+		
+		
+		ArrayList<Integer> indexes = new ArrayList<Integer>();
+		for(int i=0; i<neurons.length; i++)
+			if(neurons[i] == true)
+				indexes.add(i);
+		
+		return indexes.get(random.nextInt(indexes.size()));*/
+		ArrayList<Integer> indexes = new ArrayList<Integer>();
+		if(!nonInput) 
+			for(int i=0; i<Inputs; i++) 
+				indexes.add(i);
+		for(int o=0; o<Outputs; o++)
+			indexes.add(MaxNodes+o);
+		for(int i=0; i<genes.size(); i++) {
+			if(!nonInput || genes.get(i).into > Inputs)
+				indexes.add(genes.get(i).into);
+			if(!nonInput || genes.get(i).out > Inputs)
+				indexes.add(genes.get(i).out);
+		}
+		return indexes.get(random.nextInt(indexes.size()));
 	}
 	
 	///////////////////////////////////////////////////////////////
-	// need to do	
 	public void mutate(Genome genome)
 	{
 		double p; 
@@ -270,21 +311,69 @@ public class Neat {
 	}
 	public void linkMutate(Genome genome, boolean forceBias)
 	{
-		Neuron neuron1 = randomNeuron(genome.genes, false);
-		Neuron neuron2 = randomNeuron(genome.genes, true);
+		int neuron1 = randomNeuron(genome.genes, false);
+		int neuron2 = randomNeuron(genome.genes, true);
 		
 		Gene newLink = new Gene();
-		//if(neuron1 <= Inputs && neuron2 <= Inputs) 
-		//	return;
+		if(neuron1 <= Inputs && neuron2 <= Inputs) 
+			return;
 		
+		if(neuron2 <= Inputs) {
+			//Swap output and input
+			int temp = neuron1;
+			neuron1 = neuron2;
+			neuron2 = temp;
+		}
+		
+		newLink.into = neuron1;
+		newLink.out = neuron2;
+		if(forceBias)
+			newLink.into = Inputs;
+		
+		if(genome.genes.contains(newLink))
+			return;
+		
+		newLink.innovation = pool.newInnovation();
+		newLink.weight = random.nextDouble() * 4 - 2; //TODO check if execution order is correct
+		
+		genome.genes.add(newLink);
 	}
+	
 	public void nodeMutate(Genome genome)
 	{
+		if (genome.genes.size() == 0)
+			return;
 		
+		genome.maxneuron++;
+		
+		Gene gene = genome.genes.get(random.nextInt(genome.genes.size())); //TODO check if this will error, may be off by one
+		if (!gene.enabled)
+			return;
+		gene.enabled = false;
+		
+		Gene gene1 = gene.copy();
+		gene1.out = genome.maxneuron; 
+		gene1.weight = 1.0;
+		gene1.innovation = pool.newInnovation();
+		gene1.enabled = true;
+		genome.genes.add(gene1);
+		
+		Gene gene2 = gene.copy();
+		gene2.into = genome.maxneuron;
+		gene2.innovation = pool.newInnovation();
+		gene2.enabled = true; 
+		genome.genes.add(gene2);
 	}
 	public void enableDisableMutate(Genome genome, boolean enable)
 	{
-		
+		ArrayList<Gene> candidates = new ArrayList<Gene>();
+		for(Gene gene : genome.genes)
+			if (!gene.enabled)
+				candidates.add(gene);
+		if(candidates.isEmpty())
+			return;
+		Gene gene = candidates.get(random.nextInt(candidates.size())); //TODO maybe off by one error, must test
+		gene.enabled = !gene.enabled;
 	}
 	
 	///////////////////////////////////////////////////////////////
@@ -337,9 +426,9 @@ public class Neat {
         int currentFrame = 0;
 		int maxFitness = 0;
 		
-		public void newInnovation()
+		public int newInnovation()
 		{
-			innovation++;
+			return ++innovation;
 		}
 	}
 	public class Species{
@@ -363,7 +452,7 @@ public class Neat {
 		double disable = DisableMutationChance;
 		double step = StepSize;
 		
-		double maxneuron = 0;//???
+		int maxneuron = 0;//???
 		
 		public Genome copy()
 		{
