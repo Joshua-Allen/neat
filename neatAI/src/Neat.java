@@ -47,13 +47,16 @@ public class Neat {
 	{
 		random = new Random();
 		random.setSeed(System.currentTimeMillis());
+		
+		initializePool();
 	}
 	
 	///////////////////////////////////////////////////////////////
 	public void update()
 	{
 		int curScore = getScore();
-		
+		// get current room
+		//
 		
 	}
 
@@ -106,6 +109,11 @@ public class Neat {
 		genome.maxneuron = 5;
 		
 		return genome;
+	}
+	
+	public void generateNetwork(Genome genome)
+	{
+		//TODO
 	}
 	
 	public Outputs evaluateNetwork(Network network, Inputs inputs)
@@ -379,6 +387,7 @@ public class Neat {
 		gene.enabled = !gene.enabled;
 	}
 	
+	///////////////////////////////////////////////////////////////
 	public double disjoint(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
 		int disjointGenes = 0;
 		for(int i=0; i<genes1.size(); i++) 
@@ -438,7 +447,263 @@ public class Neat {
 			global.get(g).globalRank = g;
 	}
 	
+	public void calculateAverageFitness(Species species)
+	{
+		int total = 0;
+		
+		for(Genome gen: species.genomes)
+		{
+			total += gen.globalRank;
+		}
+		
+		species.averageFitness = total / species.genomes.size();
+	}
 	
+	public int totalAverageFitness()
+	{
+		int total = 0;
+		
+		for(Species species: pool.species)
+		{
+			total += species.averageFitness;
+		}
+		
+		return total;
+	}
+	
+	public void cullSpecies(boolean cutToOne)
+	{
+		for(Species species: pool.species)
+		{
+			species.sort();
+			
+			int remaining = (int) Math.ceil(species.genomes.size());
+			
+			if (cutToOne)
+			{
+				remaining = 1;
+			}
+			
+			while (species.genomes.size() > remaining)
+			{
+				species.genomes.remove(species.genomes.size()-1);
+			}
+		}
+	}
+	
+	public Genome breedChild(Species species)
+	{
+		Genome child;
+		
+		if (random.nextDouble() < CrossoverChance)
+		{
+			Genome g1 = species.genomes.get(random.nextInt(species.genomes.size()));
+			Genome g2 = species.genomes.get(random.nextInt(species.genomes.size()));
+			child = crossover(g1, g2);
+		} else {
+			Genome g = species.genomes.get(random.nextInt(species.genomes.size()));
+			child = g.copy();
+		}
+		
+		mutate(child);
+		
+		return child;
+	}
+	
+	public void removeStaleSpecies()
+	{
+		ArrayList<Species> survived = new ArrayList<Species>();
+		
+		for(Species species: pool.species)
+		{
+			species.sort();
+			
+			Genome g = species.genomes.get(0);
+			
+			if (g.fitness > species.topFitness)
+			{
+				species.topFitness = g.fitness;
+				species.staleness = 0;
+			} else {
+				species.staleness = species.staleness + 1;
+			}
+			
+			if (species.staleness < StaleSpecies || species.topFitness >= pool.maxFitness)
+			{
+				survived.add(species);
+			}
+			
+		}
+		
+		pool.species = survived;
+		
+	}
+	
+	public void removeWeakSpecies()
+	{
+		ArrayList<Species> survived = new ArrayList<Species>();
+		
+		int sum = totalAverageFitness();
+		for(Species species: pool.species)
+		{
+            double breed = Math.floor(species.averageFitness / sum * Population);
+            if (breed >= 1)
+            {
+            	survived.add(species);
+            }
+		}
+		pool.species = survived;
+	}
+	
+	///////////////////////////////////////////////////////////////
+	public void addToSpecies(Genome child)
+	{
+		boolean foundSpecies = false;
+		for(Species species: pool.species)
+		{
+			if (!foundSpecies && sameSpecies(child, species.genomes.get(0)))
+			{
+				species.genomes.add(child);
+				foundSpecies = true;
+			}
+		}
+		
+		if (!foundSpecies)
+		{
+			Species sp = new Species();
+			sp.genomes.add(child);
+			pool.species.add(sp);
+		}
+	}
+	
+	public void newGeneration()
+	{
+		cullSpecies(false);
+		rankGlobally();
+		removeStaleSpecies();
+		rankGlobally();
+		
+		for(Species species: pool.species)
+		{
+			calculateAverageFitness(species);
+		}
+		
+		removeWeakSpecies();
+		
+		int sum = totalAverageFitness();
+		ArrayList<Genome> children = new ArrayList<Genome>();
+		
+		for(Species species: pool.species)
+		{
+			double breed = Math.floor(species.averageFitness / sum * Population) - 1;
+			for(int i=0; i<breed; i++)
+			{
+				children.add(breedChild(species));
+			}
+		}
+		
+		cullSpecies(true);
+		while(children.size()+pool.species.size() < Population)
+		{
+			Species species = pool.species.get(random.nextInt(pool.species.size()));
+			children.add(breedChild(species));
+		}
+		
+		for(Genome child: children)
+		{
+			addToSpecies(child);
+		}
+		
+		pool.generation++;
+	}
+	
+	public void initializePool()
+	{
+		pool = new Pool();
+		
+		for(int i=0; i<Population; i++)
+		{
+			addToSpecies(basicGenome());
+		}
+		
+		initializeRun();
+	}
+	
+	public void initializeRun()
+	{
+		// TODO: send load game command
+		Species species = pool.species.get(pool.currentSpecies);
+		Genome genome = species.genomes.get(pool.currentGenome);
+		generateNetwork(genome);
+		evaluateCurrent();
+	}
+	
+	public void evaluateCurrent()
+	{
+		Species species = pool.species.get(pool.currentSpecies);
+		Genome genome = species.genomes.get(pool.currentGenome);
+		
+		Inputs inputs = getInputs();
+		Outputs controller = evaluateNetwork(genome.network, inputs);
+		//TODO: joypad.set(controller)
+	}
+	
+	///////////////////////////////////////////////////////////////
+	public void nextGenome()
+	{
+		pool.currentGenome++;
+		
+		if (pool.currentGenome > pool.species.get(pool.currentSpecies).genomes.size())
+		{
+			pool.currentGenome = 1;
+			pool.currentSpecies++;
+			if (pool.currentSpecies > pool.species.size())
+			{
+				newGeneration();
+				pool.currentSpecies = 1;
+			}
+		}
+	}
+	
+	public boolean fitnessAlreadyMeasured()
+	{
+		Species species = pool.species.get(pool.currentSpecies);
+		Genome genome = species.genomes.get(pool.currentGenome);
+		
+		return genome.fitness != 0;
+	}
+	
+	public void playTop()
+	{
+		int maxfitness = 0;
+		int maxs = 0;
+		int maxg = 0;
+		
+		for(int i=0; i<pool.species.size(); i++)
+		{
+			Species species = pool.species.get(i);
+			
+			for(int j=0; j<species.genomes.size(); j++)
+			{
+				Genome genome = species.genomes.get(j);
+				
+				if (genome.fitness > maxfitness)
+				{
+					maxfitness = genome.fitness;
+					maxs = i;
+					maxg = j;
+				}
+			}
+		}
+		
+		pool.currentSpecies = maxs;
+		pool.currentGenome = maxg;
+		pool.maxFitness = maxfitness;
+		//TODO:
+		//forms.settext(maxFitnessLabel, "Max Fitness: " .. math.floor(pool.maxFitness))
+		initializeRun();
+		pool.currentFrame++;
+	}
 	
 	///////////////////////////////////////////////////////////////
 	public class Network{
@@ -500,6 +765,11 @@ public class Neat {
 		int topFitness = 0;
 		int staleness = 0;
 		int averageFitness = 0;
+		
+		public void sort()
+		{
+			Collections.sort(genomes);
+		}
 		
 		public void calculateAverageFitness() {
 			int total = 0; 
@@ -602,5 +872,33 @@ public class Neat {
 	}
 	
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
