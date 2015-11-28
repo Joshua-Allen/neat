@@ -448,7 +448,8 @@ public class WindowPanel extends JPanel{
     	g2d.fillRect(0, 0, 5000, 640); 
     	g2d.setComposite(AlphaComposite.SrcOver);
     	
-    	((simple_ai)ai).draw(g2d);
+    	//((simple_ai)ai).draw(g2d);
+    	((Neat)ai).draw(g2d);
     	/*
     	int startX = 50;
     	int startY = 50;

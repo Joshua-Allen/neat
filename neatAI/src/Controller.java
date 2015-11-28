@@ -22,7 +22,8 @@ public class Controller {
 		gameboy = new Gameboy(this);
 		
 		//
-		simple_ai ai = new simple_ai(this);
+		//simple_ai ai = new simple_ai(this);
+		Neat ai = new Neat(this);
 		
 		//
 		

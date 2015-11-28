@@ -1,3 +1,5 @@
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -43,8 +45,10 @@ public class Neat {
 	boolean start = false;
 	
 	///////////////////////////////////////////////////////////////
-	public Neat()
+	public Neat(Controller controller)
 	{
+		this.controller = controller;
+		
 		random = new Random();
 		random.setSeed(System.currentTimeMillis());
 		
@@ -54,30 +58,126 @@ public class Neat {
 		initializePool();
 	}
 	
+	// just for communication
 	///////////////////////////////////////////////////////////////
-	public void update()
+	ArrayList<String> tasks = new ArrayList<String>();
+	ArrayList<String> send = new ArrayList<String>();
+	
+	int addTasks()
 	{
-		int curScore = getScore();
-		// get current room
-		//
+		if (!controller.gameboy.getScreenType().equals("inGame"))
+		{
+			menuTasks();
+			return 0;
+		}
+		return 1;
+	}
+	
+	void menuTasks()
+	{
+		tasks.add("release_down");
+		tasks.add("release_up");
 		
+		switch(controller.gameboy.getScreenType())
+		{
+		case "title":  case "gameOver": case "pause":
+			tasks.add("enter"); break;
+		case "levelChoose": case "gameType":
+			tasks.add("left"); 
+			tasks.add("enter"); 
+			break;
+		}
+	}
+	
+	void runTasks()
+	{
+		while(tasks.size() > 0)
+		{
+			String task = tasks.remove(0);
+			switch(task)
+			{
+				case "rotate_left": send.add("press_a"); break;
+				case "rotate_right": send.add("press_b"); break;
+				case "left": send.add("press_left"); break;
+				case "right": send.add("press_right"); break;
+				case "down": send.add("press_down"); break;
+				case "enter": send.add("press_start"); break;
+
+				case "hold_rotate_left": send.add("hold_a"); break;
+				case "release_rotate_left": send.add("release_a"); break;
+
+				case "hold_rotate_right": send.add("hold_b"); break;
+				case "release_rotate_right": send.add("release_b"); break;
+				
+				case "hold_left": send.add("hold_left"); break;
+				case "release_left": send.add("release_left"); break;
+				
+				case "hold_right": send.add("hold_right"); break;
+				case "release_right": send.add("release_right"); break;
+				
+				case "hold_down": send.add("hold_down"); break;
+				case "release_down": send.add("release_down"); break;
+				
+				case "hold_up": send.add("hold_up"); break;
+				case "release_up": send.add("release_up"); break;
+				
+			}
+		}
+	}
+	
+	void sendTasks() 
+	{
+		addTasks();
+		runTasks();
+		
+		//
+		for(String send : send)
+		{
+			controller.network.sendToEmulater(send);
+		}
+		
+		tasks.clear();
+		send.clear();
+	}
+	
+	///////////////////////////////////////////////////////////////
+	
+	public void run()
+	{
+		//
+		Species species = pool.species.get(pool.currentSpecies);
+		Genome genome = species.genomes.get(pool.currentGenome);
+		
+		//
+        if (pool.currentFrame % 5 == 0) evaluateCurrent();
+        
+        int curScore = getScore();
+        
+        
+        pool.currentFrame++;
+        
 	}
 
 	// need to do
 	public int getScore()
 	{
-		int score = 0;
-		
-		
-		
-		return score;
+		return controller.gameboy.score;
 	}
 	
 	// need to do
- 	public void draw()
+ 	public void draw(Graphics2D g)
 	{
-		
+ 		g.setColor(Color.BLACK);
+ 		
+ 		
+ 		
+ 		g.drawString("test", 5, 350);
 	}
+ 	
+ 	
+	///////////////////////////////////////////////////////////////
+ 	
+ 	
  	
 	///////////////////////////////////////////////////////////////
  	
@@ -96,6 +196,7 @@ public class Neat {
  	 		{
 				Map cell = window.getPoint(4+x*8, 4+y*8);
 				String tile = (String) cell.get("tile");
+				if (tile != null)
 				inputs.inputs.add(Integer.parseInt(tile));
  	 		}
  		}
@@ -119,15 +220,17 @@ public class Neat {
 	
 	public void generateNetwork(Genome genome)
 	{
-		//TODO
+		new Network(genome, inputs.inputs.size(), outputs.outputs.length);
 	}
-	
+
 	public Outputs evaluateNetwork(Network network, Inputs inputs)
 	{
+		
+		
 		// 
 		for(int i=0; i<inputs.inputs.size(); i++)
 		{
-			network.neurons[i].value = (double) inputs.inputs.get(i);
+			network.neurons[i].value = (double) ((Integer) inputs.inputs.get(i)).intValue();
 		}
 		
 		//
@@ -136,8 +239,8 @@ public class Neat {
 			int sum = 0;
 			Neuron cur_neuron = network.neurons[i];
 			
-			for(int j=0; j<cur_neuron.incoming.size(); j++)
-			{
+			//System.out.println(cur_neuron);
+			for(int j=0; j<cur_neuron.incoming.size(); j++){
 				Gene incoming = cur_neuron.incoming.get(j);
 				Neuron other = network.neurons[incoming.into];
 				sum += incoming.weight * other.value;
@@ -394,20 +497,33 @@ public class Neat {
 	}
 	
 	///////////////////////////////////////////////////////////////
+	
 	public double disjoint(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
 		int disjointGenes = 0;
+		
+		
+		
 		for(int i=0; i<genes1.size(); i++) 
+		{
 			if(!genes2.contains(genes1.get(i)))  // may need custom contains
+			{
 				disjointGenes++;
-			
+			}
+		}
+		
 		for(int i=0; i<genes2.size(); i++) 
+		{
 			if(!genes1.contains(genes2.get(i)))
+			{
 				disjointGenes++;
+			}
+		}
 		
 		int n = Math.max(genes1.size(), genes2.size());
-		
+		if (n == 0) n = 1;
 		return disjointGenes / n;
 	}
+	
 	
 	public double weights(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
 		ArrayList<Gene> genes = new ArrayList<Gene>();
@@ -714,18 +830,22 @@ public class Neat {
 	///////////////////////////////////////////////////////////////
 	public class Network{
 		
-		Neuron[] neurons;// = Neuron[];
+		Neuron[] neurons = new Neuron[50];
 		//neurons
 		
 		public Network(Genome genome, int inputNumber, int outputNumber)
 		{
+
 			neurons = new Neuron[MaxNodes+outputNumber];
 			
-			for(int i=0; i<inputNumber; i++)
+			for(int i=0; i<neurons.length; i++)
 				neurons[i] = new Neuron();
+			
+			//for(int i=0; i<inputNumber; i++)
+			//	neurons[i] = new Neuron();
 
-			for(int i=0; i<inputNumber; i++)
-				neurons[MaxNodes+i] = new Neuron();
+			//for(int i=0; i<inputNumber; i++)
+			//	neurons[MaxNodes+i] = new Neuron();
 		
 			genome.sort();
 			
@@ -756,8 +876,8 @@ public class Neat {
 		ArrayList<Species> species = new ArrayList<Species>();
         int generation = 0;
         int innovation = 0;
-        int currentSpecies = 1;
-        int currentGenome = 1;
+        int currentSpecies = 0;
+        int currentGenome = 0;
         int currentFrame = 0;
 		int maxFitness = 0;
 		
@@ -872,6 +992,7 @@ public class Neat {
 	// ??????
 	public class Inputs{
 		public ArrayList inputs = new ArrayList();
+		
 	}
 	public class Outputs{
 		boolean[] outputs = {false, false, false, false, false, false};
