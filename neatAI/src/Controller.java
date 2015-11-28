@@ -5,6 +5,8 @@ public class Controller {
 	
 	WindowPanel w;
 	Network network;
+	Gameboy gameboy;
+	
 	String data = "";
 	long period = 100;
 	
@@ -16,6 +18,8 @@ public class Controller {
 		
 		// create a new network that talks to the emulator
 		network = new Network();
+		
+		gameboy = new Gameboy(this);
 		
 		//
 		simple_ai ai = new simple_ai(this);
@@ -51,13 +55,15 @@ public class Controller {
 				} else 
 				if (state == 3)
 				{
+					gameboy.update();
 					// update the ai
 					ai.run();
+					w.draw_ai(ai);
 					state = 0;
 				}
 				
 				//
-				//w.draw_ai(ai);
+				
 			}
 		}, 1, period);
 	}

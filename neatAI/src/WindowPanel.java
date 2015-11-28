@@ -18,6 +18,9 @@ public class WindowPanel extends JPanel{
 	JFrame frame;
 	
 	//
+	public JTextArea textAreal = new JTextArea("", 50, 50);
+	
+	//
 	int screen_scale = 2;
 	
 	//
@@ -44,11 +47,16 @@ public class WindowPanel extends JPanel{
 	public WindowPanel()
 	{
 		frame = new JFrame("AI");
+		frame.setLayout(null);
 		frame.add(this);
-		frame.setSize(337, 330);
+		this.setBounds(0, 0, 5000, 5000);
+		frame.setSize(337*3, 330*2);
 		frame.setVisible(true);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+		frame.add(textAreal);
+		textAreal.setBounds(337, 15, 640, 400);
+		
 		main_image = new BufferedImage(160, 144, BufferedImage.TYPE_INT_ARGB);
 		simple_image_tile = new BufferedImage(160, 144, BufferedImage.TYPE_INT_ARGB);
 		tile_image = new BufferedImage(128, 192, BufferedImage.TYPE_INT_ARGB);
@@ -93,9 +101,10 @@ public class WindowPanel extends JPanel{
     public void paint(Graphics g) {
 		Graphics2D g2d = (Graphics2D) g;
 		g2d.drawImage(simple_image_tile, 0, 0, 160*screen_scale, 144*screen_scale, null);
-		g2d.drawImage(main_image, 0, 144*screen_scale + 5, 160, 144, null);
-		g2d.drawImage(tile_image, 160+5, 144*screen_scale + 5, 128, 192, null);
+		//g2d.drawImage(main_image, 0, 144*screen_scale + 5, 160, 144, null);
+		//g2d.drawImage(tile_image, 160+5, 144*screen_scale + 5, 128, 192, null);
 		g2d.drawImage(network_image, 0, 0, 5000, 640, null);
+		
     }
     
     

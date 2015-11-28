@@ -16,8 +16,8 @@ public class Neat {
 	
 	Random random; //needed through project, especially in mutate methods
 	Pool pool; //needed in nodeMutate method to access the newInnovation method
-	int Inputs = 0; // TODO value should not be 0. needed in linkMutate and randomNeuron methods
-	int Outputs = 0; // TODO value should not be 0. needed in randomNeuron method at least
+	Inputs inputs; // TODO value should not be 0. needed in linkMutate and randomNeuron methods
+	Outputs outputs; // TODO value should not be 0. needed in randomNeuron method at least
 	
 	int Population = 300;
 	double DeltaDisjoint = 2.0;
@@ -48,6 +48,9 @@ public class Neat {
 		random = new Random();
 		random.setSeed(System.currentTimeMillis());
 		
+		inputs = new Inputs();
+		outputs = new Outputs();
+		
 		initializePool();
 	}
 	
@@ -75,6 +78,9 @@ public class Neat {
 	{
 		
 	}
+ 	
+	///////////////////////////////////////////////////////////////
+ 	
 	
 	///////////////////////////////////////////////////////////////
  	public Inputs getInputs()
@@ -244,14 +250,14 @@ public class Neat {
 		return indexes.get(random.nextInt(indexes.size()));*/
 		ArrayList<Integer> indexes = new ArrayList<Integer>();
 		if(!nonInput) 
-			for(int i=0; i<Inputs; i++) 
+			for(int i=0; i<inputs.inputs.size(); i++) 
 				indexes.add(i);
-		for(int o=0; o<Outputs; o++)
+		for(int o=0; o<outputs.outputs.length; o++)
 			indexes.add(MaxNodes+o);
 		for(int i=0; i<genes.size(); i++) {
-			if(!nonInput || genes.get(i).into > Inputs)
+			if(!nonInput || genes.get(i).into > inputs.inputs.size())
 				indexes.add(genes.get(i).into);
-			if(!nonInput || genes.get(i).out > Inputs)
+			if(!nonInput || genes.get(i).out > inputs.inputs.size())
 				indexes.add(genes.get(i).out);
 		}
 		return indexes.get(random.nextInt(indexes.size()));
@@ -326,10 +332,10 @@ public class Neat {
 		int neuron2 = randomNeuron(genome.genes, true);
 		
 		Gene newLink = new Gene();
-		if(neuron1 <= Inputs && neuron2 <= Inputs) 
+		if(neuron1 <= inputs.inputs.size() && neuron2 <= inputs.inputs.size()) 
 			return;
 		
-		if(neuron2 <= Inputs) {
+		if(neuron2 <= inputs.inputs.size()) {
 			//Swap output and input
 			int temp = neuron1;
 			neuron1 = neuron2;
@@ -339,7 +345,7 @@ public class Neat {
 		newLink.into = neuron1;
 		newLink.out = neuron2;
 		if(forceBias)
-			newLink.into = Inputs;
+			newLink.into = inputs.inputs.size();
 		
 		if(genome.genes.contains(newLink)) //TODO test if we need custom contains method
 			return;

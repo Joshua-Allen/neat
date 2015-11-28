@@ -10,6 +10,7 @@ import java.util.Map;
 public class simple_ai {
 
 	Controller con;
+	Gameboy gameboy;
 	
 	//String state = "start";
 	ArrayList<String> tasks = new ArrayList<String>();
@@ -21,9 +22,16 @@ public class simple_ai {
 	
 	Goal curGoal = new Goal();
 	
+	//keep track of score
+	boolean in_game = false;
+	ArrayList<Score> scores = new ArrayList<Score>();
+	Score current_score = null;
+	
+	
 	public simple_ai(Controller con)
 	{
 		this.con = con;
+		gameboy = con.gameboy;
 	}
 	
 	
@@ -92,14 +100,25 @@ public class simple_ai {
 		return "unknown";
 	}
 	
-	
 	void addTasks()
 	{
 		if (!getScreenType().equals("inGame"))
 		{
 			menuTasks();
+			in_game = false;
 			return;
 		}
+		
+		if (in_game == false)
+		{
+			in_game = true;
+			current_score = new Score();
+			scores.add(current_score);
+		}
+		
+		current_score.level = gameboy.level;
+		current_score.lines = gameboy.lines;
+		current_score.score = gameboy.score;
 		
 		//
 		Sprite curSpr = new Sprite();
@@ -111,24 +130,38 @@ public class simple_ai {
 		findGoal(new Sprite());
 		//tasks.add("findGoal");
 		//
-		boolean cmp = curSpr.compare(curGoal.spr, 0);
-		if (cmp == false) tasks.add("rotate");
+		boolean cmp_0 = curSpr.compare(curGoal.spr, 0);
+		boolean cmp_1 = curSpr.compare(curGoal.spr, 1);
+		boolean cmp_2 = curSpr.compare(curGoal.spr, 2);
+		boolean cmp_3 = curSpr.compare(curGoal.spr, 3);
+		
+		
+		boolean move = false;
+		
+		//tasks.add("release_rotate_right");
+		
+		if (curSpr.compare(curGoal.spr, 0) == false)
+		{
+			tasks.add("rotate_right");
+			move = true;
+		}
+		
 		
 		//
 		if (curGoal.x == -1) return;
 		
 		//
-		boolean move = false;
-		if(cmp == true)
-		{
-			if(curSpr.x > curGoal.x+2)  {tasks.add("left"); move = true;}
-			if(curSpr.x < curGoal.x+2)  {tasks.add("right");move = true;}
-		}
-		
+		if(curSpr.x > curGoal.x+2)  {tasks.add("left"); move = true;}
+		if(curSpr.x < curGoal.x+2)  {tasks.add("right"); move = true;}
+			
+			tasks.add("release_down");
 		//
 		if (move == false)
 		{
-			tasks.add("down");
+			tasks.add("hold_down");
+			tasks.add("release_up");
+		} else {
+			tasks.add("hold_up");
 		}
 	}
 	
@@ -140,17 +173,40 @@ public class simple_ai {
 			switch(task)
 			{
 				case "findGoal": findGoal(new Sprite()); break;
-				case "rotate": send.add("press_a"); break;
+				case "rotate_left": send.add("press_a"); break;
+				case "rotate_right": send.add("press_b"); break;
 				case "left": send.add("press_left"); break;
 				case "right": send.add("press_right"); break;
 				case "down": send.add("press_down"); break;
 				case "enter": send.add("press_start"); break;
+
+				case "hold_rotate_left": send.add("hold_a"); break;
+				case "release_rotate_left": send.add("release_a"); break;
+
+				case "hold_rotate_right": send.add("hold_b"); break;
+				case "release_rotate_right": send.add("release_b"); break;
+				
+				case "hold_left": send.add("hold_left"); break;
+				case "release_left": send.add("release_left"); break;
+				
+				case "hold_right": send.add("hold_right"); break;
+				case "release_right": send.add("release_right"); break;
+				
+				case "hold_down": send.add("hold_down"); break;
+				case "release_down": send.add("release_down"); break;
+				
+				case "hold_up": send.add("hold_up"); break;
+				case "release_up": send.add("release_up"); break;
+				
 			}
 		}
 	}
 	
 	void menuTasks()
 	{
+		tasks.add("release_down");
+		tasks.add("release_up");
+		
 		switch(getScreenType())
 		{
 		case "title":  case "gameOver": case "pause":
@@ -281,93 +337,191 @@ public class simple_ai {
 	// returns the score that the game is
 	int testNewGame(int[][] newGame)
 	{
-		int score = 0;
+		int score = 50;
+
+		int number_of_filled_rows = 0;
+		int number_of_new_holes = 0;
+		int number_of_cells_from_worldBottom_to_spriteTop = 0;
+		int number_of_cells_from_worldLeft_to_spriteLeft = -1;
+		int number_of_cells_from_worldRight_to_spriteRight = -1;
 		
+		int percent_of_taken_around_sprite = 0;
+		
+		
+		//////////////////////////////
 		// look for filled rows
-		for(int y=0; y<18; y++)
-		{
+		//////////////////////////////
+		
+		// Scene each cell from top to bottom
+		for(int y=0; y<18; y++) {
 			boolean filled = true;
-			for(int x=0; x<10; x++)
-			{
-				if (newGame[x][y] == 0) 
-				{
+			// Scene each cell from left to right
+			for(int x=0; x<10; x++) {
+				// when there is an empty cell we know that the row is not full
+				if (newGame[x][y] == 0)  {
 					filled = false;
 					break;
 				}
 			}
-			if (filled) score += 20;
+			if (filled) number_of_filled_rows++;
 		}
 		
+		//////////////////////////////
 		// look for new holes
-		for(int x=0; x<10; x++)
-		{
+		//////////////////////////////
+		
+		// Scene each cell from left to right
+		for(int x=0; x<10; x++){
 			boolean under = false;
-			for(int y=0; y<17; y++)
+			// Scene each cell from top to bottom
+			for(int y=0; y<18; y++)
 			{
-				if (newGame[x][y] == 2) 
-				{
-					under = true;
-				}
-				if (under == true)
-				{
-					if (newGame[x][y] == 0)
-					{
-						score -= 5;
-					}
-					if (newGame[x][y] == 1)
-					{
-						under = false;
-					}
+				// if a cell is the sprite 
+				if (newGame[x][y] == 2) under = true;
+				if (under == true) {
+					// if there is a hole it must be a new hole
+					if (newGame[x][y] == 0) number_of_new_holes++;
+					// if there is a block in a cell anything under must be old
+					if (newGame[x][y] == 1) under = false;
 				}
 			}
 		}
 		
-		// check the height
-		int dis = 0;
-		for(int y=0; y<17; y++)
-		{
-			int count = 0;
-			for(int x=0; x<10; x++)
-			{
-				count = Math.max(count, newGame[x][y]);
-				if (newGame[x][y] == 1)
+		//////////////////////////////
+		// check the height and check the sides
+		//////////////////////////////
+		
+		boolean foundSprite = false;
+
+		// Scene each cell from bottom to top
+		for(int y=17; y>=0; y--) {
+			
+			int left = 0;
+			int right = 0;
+			
+			boolean Sprite_in_row = false;
+			// Scene each cell from left to right
+			for(int x=0; x<10; x++){
+				if(newGame[x][y] == 2)
 				{
-					y = 500;
-					break;
-				}
-				if (newGame[x][y] == 2) 
-				{
-					if (newGame[x][y+1] == 0)
-					{
-						score -= 5;
+					Sprite_in_row = true;
+					if (foundSprite == false) {foundSprite = true;}
+				} else {
+					if (Sprite_in_row) {
+						right++;
+					} else {
+						left++;
 					}
 				}
 			}
-			if (count == 2)
+			if (Sprite_in_row)
 			{
-				dis++;
-			}
-			if (count == 1)
-			{
+				//number_of_cells_from_worldLeft_to_spriteLeft = left;
+				if (number_of_cells_from_worldLeft_to_spriteLeft == -1) {number_of_cells_from_worldLeft_to_spriteLeft = left;}
+				if (number_of_cells_from_worldRight_to_spriteRight == -1) number_of_cells_from_worldRight_to_spriteRight = right;
 				
-				score -= dis*5;
-				break;
+				if (number_of_cells_from_worldLeft_to_spriteLeft > left) {number_of_cells_from_worldLeft_to_spriteLeft = left;}
+				if (number_of_cells_from_worldRight_to_spriteRight > right) number_of_cells_from_worldRight_to_spriteRight = right;
 			}
 			
+			if (foundSprite == Sprite_in_row)
+			{
+				number_of_cells_from_worldBottom_to_spriteTop++;
+			} else {
+				break;
+			}
 		}
 		
+		//////////////////////////////
+		// percent_of_taken_around_sprite
+		//////////////////////////////
 		
+		// Scene each cell from left to right
+		/*for(int x=0; x<10; x++){
+			// Scene each cell from top to bottom
+			for(int y=0; y<18; y++) {
+				
+			}
+		}*/
+		
+		
+		//////////////////////////////
+		// calculate the score
+		//////////////////////////////
+		
+		score += number_of_filled_rows;
+		score -= number_of_new_holes*10;
+		score -= number_of_cells_from_worldBottom_to_spriteTop*3;
+		
+		// a slight pull to the sides
+		score -= Math.min(number_of_cells_from_worldLeft_to_spriteLeft,number_of_cells_from_worldRight_to_spriteRight);
+				
 		
 		return score;
 	}
 
-	// really just for debugging
+	// 
 	void draw(Graphics2D g)
 	{
-		g.setColor(Color.BLACK);
+		//g.setColor(Color.BLACK);
 		
-		//g.drawString(getScreenType(), 500, 25);
+		/*
+		Score best = null;//new Score();
+		Score worst = null;//new Score(999999);
+		Score average = new Score();
 		
+		for(int i=0; i<scores.size(); i++)
+		{
+			Score cur = scores.get(i);
+			if (cur != current_score)
+			{
+				if (best == null) best = cur;
+				if (worst == null) worst = cur;
+				
+				if (cur.score < worst.score) worst = cur;
+				if (cur.score > best.score)  best = cur;
+				
+				average.level += cur.level;
+				average.lines += cur.lines;
+				average.score += cur.score;
+			}
+		}
+		
+		if (scores.size() > 1)
+		{
+			average.level /= scores.size()-1;
+			average.lines /= scores.size()-1;
+			average.score /= scores.size()-1;
+		}
+		String text = "";
+		if (best != null)
+		{
+			text += "Best:		Worst:		Average:\n";
+			text += "Score:\t"+String.valueOf(best.score)+"\tScore:\t"+String.valueOf(worst.score)+"\tScore:\t"+String.valueOf(average.score)+"\n";
+			text += "Level:\t"+String.valueOf(best.level)+"\tLevel:\t"+String.valueOf(worst.level)+"\tLevel:\t"+String.valueOf(average.level)+"\n";
+			text += "Lines:\t"+String.valueOf(best.lines)+"\tLines:\t"+String.valueOf(worst.lines)+"\tLines:\t"+String.valueOf(average.lines)+"\n\n\n";
+		} else {
+			text += "Best:		Worst:		Average:\n";
+			text += "Score:\t0\tScore:\t0\tScore:\t0\n";
+			text += "Level:\t0\tLevel:\t0\tLevel:\t0\n";
+			text += "Lines:\t0\tLines:\t0\tLines:\t0\n\n\n";
+		}
+		
+		for(int i=0; i<scores.size(); i++)
+		{
+			Score cur = scores.get(i);
+			text += "Run: "+ String.valueOf(i+1) + 
+					"\tScore: " + String.valueOf(cur.score) + 
+					"\tLevel: " + String.valueOf(cur.level) + 
+					"\tLines: " + String.valueOf(cur.lines)+"\n";
+		}
+
+		con.w.textAreal.setText(text);
+		//}
+		
+		
+		
+		/*
 		// current game view
 		for(int x=0; x<10; x++)
 		{
@@ -399,7 +553,7 @@ public class simple_ai {
 			{
 				g.drawString(Integer.toHexString(curGoal.gameGoal[x][y]), 800+x*15, 115+y*15);
 			}
-		}
+		}*/
 	}
 
 	// lol
@@ -456,8 +610,9 @@ public class simple_ai {
 		// returns true if they are the same
 		boolean compare(int[][] spr, int index)
 		{
-			int[][] cmp0 = new int[4][4];;
-			int[][] cmp1 = new int[4][4];;
+			int[][] cmp0 = new int[4][4];
+			int[][] cmp1 = new int[4][4];
+			
 			if (index == 0) {
 				cmp0 = rot0; cmp1 = spr;}
 			if (index == 1) {
@@ -610,5 +765,17 @@ public class simple_ai {
 		int[][] spr = new int[4][4];
 		int[][] gameGoal = new int[10][18];
 		int x = -1;
+	}
+	
+	class Score{
+		public int score = 0;
+		public int level = 0;
+		public int lines = 0;
+		public Score(){};
+		public Score(int val)
+		{
+			score = level = lines = val;
+		};
+		
 	}
 }
