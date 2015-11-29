@@ -153,6 +153,9 @@ public class Neat {
         
         int curScore = getScore();
         
+        //
+        
+        
         
         pool.currentFrame++;
         
