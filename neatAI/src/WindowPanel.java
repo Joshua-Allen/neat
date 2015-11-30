@@ -55,7 +55,7 @@ public class WindowPanel extends JPanel{
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 		frame.add(textAreal);
-		textAreal.setBounds(337, 15, 640, 400);
+		textAreal.setBounds(15, 300, 640, 400);
 		
 		main_image = new BufferedImage(160, 144, BufferedImage.TYPE_INT_ARGB);
 		simple_image_tile = new BufferedImage(160, 144, BufferedImage.TYPE_INT_ARGB);
@@ -449,7 +449,9 @@ public class WindowPanel extends JPanel{
     	g2d.setComposite(AlphaComposite.SrcOver);
     	
     	//((simple_ai)ai).draw(g2d);
-    	((Neat)ai).draw(g2d);
+    	//((Neat)ai).draw(g2d);
+    	((GameBoy_AI)ai).draw(g2d);
+    	
     	/*
     	int startX = 50;
     	int startY = 50;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.function.Function;
@@ -11,9 +12,7 @@ import java.util.function.Function;
 import javax.swing.SpringLayout.Constraints;
 
 @SuppressWarnings("all")
-public class Neat {
-	Controller controller;
-	
+public class Neat extends GameBoy_AI{
 	String[] ButtonNames = { "A", "B", "Up", "Down", "Left", "Right"};
 	
 	Random random; //needed through project, especially in mutate methods
@@ -21,7 +20,7 @@ public class Neat {
 	Inputs inputs; // TODO value should not be 0. needed in linkMutate and randomNeuron methods
 	Outputs outputs; // TODO value should not be 0. needed in randomNeuron method at least
 	
-	int Population = 300;
+	int Population = 2;
 	double DeltaDisjoint = 2.0;
 	double DeltaWeights = 0.4;
 	double DeltaThreshold = 1.0;
@@ -38,17 +37,14 @@ public class Neat {
 	double DisableMutationChance = 0.4;
 	double EnableMutationChance = 0.2;
 	 
-	int TimeoutConstant = 20;
+	//int TimeoutConstant = 20;
 	 
 	int MaxNodes = 1000000;
 	
 	boolean start = false;
-	
 	///////////////////////////////////////////////////////////////
-	public Neat(Controller controller)
+	public Neat()
 	{
-		this.controller = controller;
-		
 		random = new Random();
 		random.setSeed(System.currentTimeMillis());
 		
@@ -57,130 +53,234 @@ public class Neat {
 		
 		initializePool();
 	}
-	
-	// just for communication
-	///////////////////////////////////////////////////////////////
-	ArrayList<String> tasks = new ArrayList<String>();
-	ArrayList<String> send = new ArrayList<String>();
-	
-	int addTasks()
-	{
-		if (!controller.gameboy.getScreenType().equals("inGame"))
-		{
-			menuTasks();
-			return 0;
-		}
-		return 1;
-	}
-	
-	void menuTasks()
-	{
-		tasks.add("release_down");
-		tasks.add("release_up");
-		
-		switch(controller.gameboy.getScreenType())
-		{
-		case "title":  case "gameOver": case "pause":
-			tasks.add("enter"); break;
-		case "levelChoose": case "gameType":
-			tasks.add("left"); 
-			tasks.add("enter"); 
-			break;
-		}
-	}
-	
-	void runTasks()
-	{
-		while(tasks.size() > 0)
-		{
-			String task = tasks.remove(0);
-			switch(task)
-			{
-				case "rotate_left": send.add("press_a"); break;
-				case "rotate_right": send.add("press_b"); break;
-				case "left": send.add("press_left"); break;
-				case "right": send.add("press_right"); break;
-				case "down": send.add("press_down"); break;
-				case "enter": send.add("press_start"); break;
 
-				case "hold_rotate_left": send.add("hold_a"); break;
-				case "release_rotate_left": send.add("release_a"); break;
-
-				case "hold_rotate_right": send.add("hold_b"); break;
-				case "release_rotate_right": send.add("release_b"); break;
-				
-				case "hold_left": send.add("hold_left"); break;
-				case "release_left": send.add("release_left"); break;
-				
-				case "hold_right": send.add("hold_right"); break;
-				case "release_right": send.add("release_right"); break;
-				
-				case "hold_down": send.add("hold_down"); break;
-				case "release_down": send.add("release_down"); break;
-				
-				case "hold_up": send.add("hold_up"); break;
-				case "release_up": send.add("release_up"); break;
-				
-			}
-		}
-	}
-	
-	void sendTasks() 
-	{
-		addTasks();
-		runTasks();
-		
-		//
-		for(String send : send)
-		{
-			controller.network.sendToEmulater(send);
-		}
-		
-		tasks.clear();
-		send.clear();
-	}
-	
 	///////////////////////////////////////////////////////////////
 	
 	public void run()
 	{
-		//
-		Species species = pool.species.get(pool.currentSpecies);
-		Genome genome = species.genomes.get(pool.currentGenome);
+		//addTasks();
 		
 		//
-        if (pool.currentFrame % 5 == 0) evaluateCurrent();
-        
-        int curScore = getScore();
-        
+		Species species = pool.species.get(pool.currentSpecies);
+		Genome genome = species.genomes.get(pool.currentGenome);		
+		
+		if (pool.currentFrame % 5 == 0) evaluateCurrent();
+		
         //
+        int fitness = getScore();
         
-        
+        // need to look for when the game is over
+        if (!inGame && AI_running){
+        	genome.fitness = fitness;
+        	if (fitness > pool.maxFitness){
+        		pool.maxFitness = fitness;
+        	}
+        	pool.currentSpecies = 0;
+        	pool.currentGenome = 0;
+        	
+        	while (fitnessAlreadyMeasured()){
+                nextGenome();
+        	}
+        	
+        	initializeRun();
+        }
+
+        addTasks();
+
         
         pool.currentFrame++;
         
-	}
-
-	// need to do
-	public int getScore()
-	{
-		return controller.gameboy.score;
 	}
 	
 	// need to do
  	public void draw(Graphics2D g)
 	{
+ 		int draw_x = 500;
+ 		int draw_y = 15;
+ 		int cell_size = 10;
+ 		
+ 		// find the network to draw
+ 		Species species = pool.species.get(pool.currentSpecies);
+ 		Genome genome = species.genomes.get(pool.currentGenome);
+ 		Network network = genome.network;
+ 		
+ 		//
+ 		ArrayList<Cell> cells = new ArrayList<Cell>();
+ 		
+ 		// get all the cells from the screen
+ 		int neuron_index = 0;
+ 		for(int x=0; x<10; x++){
+ 	 		for(int y=0; y<18; y++){
+ 	 			Cell cell = new Cell();
+ 	 			cell.x = x*cell_size;
+ 	 			cell.y = y*cell_size;
+ 	 			cell.value = network.neurons.get(neuron_index).value;
+ 	 			cells.add(cell);
+ 	 		}
+ 		}
+ 		
+ 		// Do we need a biasCell???
+ 		
+ 		
+ 		
+ 		// Outputs // draw the buttons
+ 		for(int i=0; i<outputs.outputs.length; i++)
+ 		{
+ 			Cell cell = new Cell();
+ 			cell.x = 400;
+ 			cell.y = 15*i;
+ 			cell.value = network.neurons.get(MaxNodes + i).value;
+ 			cells.add(cell);
+ 			
+ 			if (cell.value > 0)
+ 				g.setColor(Color.blue);
+		    else
+		    	g.setColor(Color.BLACK);
+ 			
+		    //gui.drawText(223, 24+8*o, ButtonNames[o], color, 9);
+	 		g.drawString(outputs.getKeyName(i).toUpperCase(), draw_x+cell.x+15, draw_y+cell.y+10); 
+ 		}
+ 		
+ 		// make a cell for all the network neurons
+ 		for(int i=0; i<network.neurons.size(); i++)
+ 		{
+ 			Neuron neuron = network.neurons.get(i);
+			if (neuron != null)
+			{
+	 			Cell cell = new Cell();
+	 			cell.x = 140;
+	 			cell.y = 40;
+	 			cell.value = neuron.value;
+	 			cells.add(cell);
+			}
+ 		}
+ 		
+ 		// fix all the placements of the cells
+ 		/*for(int r=0; r<4; r++){// just repeat 4 times
+ 			for(Gene gene: genome.genes){
+ 				if (gene.enabled){
+ 					Cell into = cells.get(gene.into);
+ 					Cell out = cells.get(gene.out);
+ 					
+ 					if (gene.into > inputs.inputs.size() && gene.into <= MaxNodes){
+ 						into.x = (int) (0.75*into.x + 0.25*out.x);
+ 						
+                        if (into.x >= out.x) into.x = into.x - 40;
+                        if (into.x < 90) into.x = 90;
+                        if (into.x > 220) into.x = 220;
+                        
+                        into.y = (int) (0.75*into.y + 0.25*into.y);
+ 					}
+ 					if (gene.out > inputs.inputs.size() && gene.out <= MaxNodes){
+ 						out.x = (int) (0.25*into.x + 0.75*out.x);
+ 						
+                        if (into.x >= out.x) out.x = out.x + 40;
+                        if (out.x < 90) out.x = 90;
+                        if (out.x > 220) out.x = 220;
+                        
+                        out.y = (int) (0.25*into.y + 0.75*out.y);
+ 					}
+ 				}
+ 			}
+ 		}*/
+ 		
+ 		////////////////////////////////////////
+ 		// Actually draw the cells
+ 		////////////////////////////////////////
+ 		
+ 		drawBox(g, draw_x, draw_y, cell_size*10, cell_size*18, Color.LIGHT_GRAY, Color.BLACK);
+ 		
+ 		// draw the cells
+ 		for(int n=0; n<cells.size(); n++)
+ 		{
+ 			Cell cell = cells.get(n);
+ 			if (n > inputs.inputs.size() || cell.value != 0){
+ 				
+ 				int alpha = 1;
+ 				if (cell.value == 0) alpha = 20;
+ 				
+ 				drawBox(g, draw_x+cell.x, draw_y+cell.y, cell_size, cell_size, Color.white, new Color(255,255,255,alpha));
+ 			}
+ 		}
+ 		/*
+ 		// draw the connecting lines
+ 		for(Gene gene: genome.genes){
+ 			if (gene.enabled){
+ 				Cell into = cells.get(gene.into);
+				Cell out = cells.get(gene.out);
+				
+				g.drawLine(into.x, into.y, out.x, out.y);
+ 			}
+ 		}
+ 		*/
+ 		
+ 		
+ 		//////////////////////////////////////////////
+ 		
+ 		//
+ 		double fitness = getScore();
+
+ 		// find percent measured
+        int measured = 0;
+        int total = 0;
+        
+        for(Species spe: pool.species){
+            for(Genome gen: spe.genomes){
+            	total++;
+            	if (gen.fitness != 0){
+            		measured++;
+            	}
+            }
+        }
+        
+ 		int percent = measured/total*100;
+        
+ 		// draw the pool info
+ 		String poolInfo = "";
+ 		poolInfo += "Generation: " + pool.generation +"\n";
+ 		poolInfo += "Species: " + pool.currentSpecies +"\n";
+ 		poolInfo += "Genome: " + pool.currentGenome +"  ("+percent+"%)"+"\n";
+ 		poolInfo += "Fitness: " + fitness +"\n";
+ 		poolInfo += "Max Fitness: " + pool.maxFitness;
+ 		
  		g.setColor(Color.BLACK);
+ 		draw_text(g, poolInfo, 330, 5);
  		
- 		
- 		
- 		g.drawString("test", 5, 350);
 	}
+ 	
+ 	// draw helpers
+ 	void draw_text(Graphics2D g, String text, int x, int y) {
+ 	    for (String line : text.split("\n"))
+ 	        g.drawString(line, x, y += g.getFontMetrics().getHeight());
+ 	}
+ 	void drawBox(Graphics2D g, int x, int y, int width, int height, Color in, Color out)
+ 	{
+ 		g.setColor(in);
+ 		g.fillRect(x, y, width, height); 	
+ 		g.setColor(out);
+ 		g.drawRect(x, y, width, height);
+ 	}
+ 	
  	
  	
 	///////////////////////////////////////////////////////////////
  	
- 	
+	public void addTasks()
+	{
+		//System.out.println("test");
+		//int i=0;
+		//for(;;)	{ i++; }
+
+		//System.out.println("test");
+		//return;
+		/*
+		if (outputs.getKey("a")){tasks.add("rotate_left");}
+		if (outputs.getKey("b")){tasks.add("rotate_right");}
+		//if (outputs.getKey("up")){tasks.add("rotate_right");}
+		if (outputs.getKey("down")){tasks.add("down");}
+		if (outputs.getKey("left")){tasks.add("left");}
+		if (outputs.getKey("right")){tasks.add("right");}*/
+	}
  	
 	///////////////////////////////////////////////////////////////
  	
@@ -223,35 +323,43 @@ public class Neat {
 	
 	public void generateNetwork(Genome genome)
 	{
-		new Network(genome, inputs.inputs.size(), outputs.outputs.length);
+		new Network(genome, inputs.inputSize, outputs.outputs.length);
 	}
 
-	public Outputs evaluateNetwork(Network network, Inputs inputs)
+	public Outputs evaluateNetwork(Network network, Inputs inputs_in)
 	{
-		
-		
 		// 
+		
+		
+		//System.out.println("size: " + inputs.inputs.size());
 		for(int i=0; i<inputs.inputs.size(); i++)
 		{
-			network.neurons[i].value = (double) ((Integer) inputs.inputs.get(i)).intValue();
+			//network.neurons[i].value = (double) ((Integer) inputs.inputs.get(i)).intValue();
+			//System.out.println("index: " + i);
+			network.neurons.get(i).value = (double) ((Integer) inputs_in.inputs.get(i)).intValue();
 		}
 		
 		//
-		for(int i=0; i<network.neurons.length; i++)
+		for(int i=0; i<network.neurons.size(); i++)
 		{
-			int sum = 0;
-			Neuron cur_neuron = network.neurons[i];
-			
-			//System.out.println(cur_neuron);
-			for(int j=0; j<cur_neuron.incoming.size(); j++){
-				Gene incoming = cur_neuron.incoming.get(j);
-				Neuron other = network.neurons[incoming.into];
-				sum += incoming.weight * other.value;
-			}
-			
-			if (cur_neuron.incoming.size() > 0)
+			Neuron cur_neuron = network.neurons.get(i);
+			if (cur_neuron != null)
 			{
-				cur_neuron.value = sigmoid(sum);
+				int sum = 0;
+				
+				//System.out.println(cur_neuron);
+				for(int j=0; j<cur_neuron.incoming.size(); j++){
+					Gene incoming = cur_neuron.incoming.get(j);
+					//Neuron other = network.neurons[incoming.into];
+					Neuron other = network.neurons.get(incoming.into);
+					
+					sum += incoming.weight * other.value;
+				}
+				
+				if (cur_neuron.incoming.size() > 0)
+				{
+					cur_neuron.value = sigmoid(sum);
+				}
 			}
 		}
 		
@@ -260,7 +368,8 @@ public class Neat {
 		
         for (int i=0; i<6; i++) 
         {
-        	if (network.neurons[MaxNodes+i].value > 0)
+        	//if (network.neurons[MaxNodes+i].value > 0)
+        	if (network.neurons.get(MaxNodes+i).value > 0)
         	{
         		out.outputs[i] = true;
         	} else {
@@ -669,15 +778,20 @@ public class Neat {
 		ArrayList<Species> survived = new ArrayList<Species>();
 		
 		int sum = totalAverageFitness();
+		System.out.println("r sum: " + sum);///////////
+		
 		for(Species species: pool.species)
 		{
             double breed = Math.floor(species.averageFitness / sum * Population);
-            if (breed >= 1)
-            {
+            //System.out.println("averageFitness: " + species.averageFitness + "   breed: " + breed);///////////
+            if (breed >= 1) {
+            	System.out.println("r breed >= 1: " + breed);///////////
             	survived.add(species);
             }
 		}
 		pool.species = survived;
+		
+		System.out.println("r pool.species.size(): " + pool.species.size());///////////
 	}
 	
 	///////////////////////////////////////////////////////////////
@@ -703,6 +817,7 @@ public class Neat {
 	
 	public void newGeneration()
 	{
+		
 		cullSpecies(false);
 		rankGlobally();
 		removeStaleSpecies();
@@ -727,10 +842,23 @@ public class Neat {
 			}
 		}
 		
+		
 		cullSpecies(true);
+		
+		System.out.println("4 pool.species.size(): " +pool.species.size());///////////
+		
 		while(children.size()+pool.species.size() < Population)
 		{
-			Species species = pool.species.get(random.nextInt(pool.species.size()));
+			//System.out.println(pool.species.size());
+			//int rInt = random.nextInt(pool.species.size()+1);
+			//System.out.println(children.size() +" - " +pool.species.size()+" - "+Population);
+			//.nextInt(High-Low) + Low;
+			int rInt = 0;
+			if (pool.species.size() > 0) rInt = random.nextInt(pool.species.size());
+			
+			//System.out.println("size: "+ pool.species.size() +" - " + rInt);
+			
+			Species species = pool.species.get(rInt);
 			children.add(breedChild(species));
 		}
 		
@@ -750,7 +878,6 @@ public class Neat {
 		{
 			addToSpecies(basicGenome());
 		}
-		
 		initializeRun();
 	}
 	
@@ -778,24 +905,31 @@ public class Neat {
 	{
 		pool.currentGenome++;
 		
-		if (pool.currentGenome > pool.species.get(pool.currentSpecies).genomes.size())
+		if (pool.currentGenome > pool.species.get(pool.currentSpecies).genomes.size()-1)
 		{
-			pool.currentGenome = 1;
+			pool.currentGenome = 0;
 			pool.currentSpecies++;
-			if (pool.currentSpecies > pool.species.size())
+			if (pool.currentSpecies > pool.species.size()-1)
 			{
 				newGeneration();
-				pool.currentSpecies = 1;
+				pool.currentSpecies = 0;
 			}
 		}
 	}
 	
 	public boolean fitnessAlreadyMeasured()
 	{
-		Species species = pool.species.get(pool.currentSpecies);
-		Genome genome = species.genomes.get(pool.currentGenome);
-		
-		return genome.fitness != 0;
+		if (pool.currentSpecies < pool.species.size())
+		{
+			Species species = pool.species.get(pool.currentSpecies);
+			if (pool.currentGenome < species.genomes.size())
+			{
+				Genome genome = species.genomes.get(pool.currentGenome);
+				
+				return genome.fitness != 0;
+			}
+		}
+		return false;
 	}
 	
 	public void playTop()
@@ -832,23 +966,21 @@ public class Neat {
 	
 	///////////////////////////////////////////////////////////////
 	public class Network{
-		
-		Neuron[] neurons = new Neuron[50];
+		HashMap<Integer, Neuron> neurons;// = new HashMap<Integer, String>();
+		//Neuron[] neurons = new Neuron[50];
 		//neurons
 		
 		public Network(Genome genome, int inputNumber, int outputNumber)
 		{
 
-			neurons = new Neuron[MaxNodes+outputNumber];
+			//neurons = new Neuron[MaxNodes+outputNumber];
+			neurons = new HashMap<Integer, Neuron>();
 			
-			for(int i=0; i<neurons.length; i++)
-				neurons[i] = new Neuron();
-			
-			//for(int i=0; i<inputNumber; i++)
-			//	neurons[i] = new Neuron();
+			for(int i=0; i<inputNumber; i++)
+				neurons.put(i, new Neuron());
 
-			//for(int i=0; i<inputNumber; i++)
-			//	neurons[MaxNodes+i] = new Neuron();
+			for(int i=0; i<outputNumber; i++)
+				neurons.put(MaxNodes+i, new Neuron());
 		
 			genome.sort();
 			
@@ -857,17 +989,19 @@ public class Neat {
 				Gene gene = genome.genes.get(i);
 				if(gene.enabled)
 				{
-					if (neurons[gene.out] == null)
+					if (neurons.get(gene.out) == null)
 					{
-						neurons[gene.out] = new Neuron();
+						//neurons[gene.out] = new Neuron();
+						neurons.put(gene.out, new Neuron());
 					}
 					
-					Neuron neuron = neurons[gene.out];
+					Neuron neuron = neurons.get(gene.out);
 					
 					neuron.incoming.add(gene);
-					if (neurons[gene.into] == null)
+					if (neurons.get(gene.out) == null)
 					{
-						neurons[gene.into] = new Neuron();
+						//neurons[gene.into] = new Neuron();
+						neurons.put(gene.into, new Neuron());
 					}
 				}
 			}
@@ -992,15 +1126,62 @@ public class Neat {
 		double value = 0.0;
 	}
 	
-	// ??????
 	public class Inputs{
 		public ArrayList inputs = new ArrayList();
 		
+		int inputSize = 11*19;
+		
 	}
 	public class Outputs{
+		//"A","B","Up","Down","Left","Right"
 		boolean[] outputs = {false, false, false, false, false, false};
+		public boolean getKey(String key)
+		{
+			switch(key)
+			{
+				case "a": return outputs[0];
+				case "b": return outputs[1];
+				case "up": return outputs[2];
+				case "down": return outputs[3];
+				case "left": return outputs[4];
+				case "right": return outputs[5];
+			}
+			return false;
+		}
+		public void setKey(String key, boolean set)
+		{
+			switch(key)
+			{
+				case "a": outputs[0] = set;
+				case "b": outputs[1] = set;
+				case "up": outputs[2] = set;
+				case "down": outputs[3] = set;
+				case "left": outputs[4] = set;
+				case "right": outputs[5] = set;
+			}
+		}
+		public String getKeyName(int index)
+		{
+			switch(index)
+			{
+				case 0: return "a";
+				case 1: return "b";
+				case 2: return "up";
+				case 3: return "down";
+				case 4: return "left";
+				case 5: return "right";
+			}
+			return "";
+		}
 	}
 	
+
+	// for drawing
+	public class Cell{
+		public int x = 0;
+		public int y = 0;
+		public double value = 0;
+	}
 }
 
 

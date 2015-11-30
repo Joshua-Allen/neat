@@ -70,9 +70,7 @@ public class Gameboy {
 		
 		keepScore();
 	}
-	
 
-	
 	public void updateTiles()
 	{
 		WindowPanel window = con.w;
@@ -118,7 +116,8 @@ public class Gameboy {
 		return "unknown";
 	}
 
-
+	
+	
 	// analytics
 	boolean in_game = false;
 	ArrayList<Score> scores = new ArrayList<Score>();

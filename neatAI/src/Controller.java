@@ -18,12 +18,15 @@ public class Controller {
 		
 		// create a new network that talks to the emulator
 		network = new Network();
-		
 		gameboy = new Gameboy(this);
 		
 		//
-		//simple_ai ai = new simple_ai(this);
-		Neat ai = new Neat(this);
+		GameBoy_AI.controller = this;
+		GameBoy_AI.gameboy = gameboy;
+		
+		//
+		//simple_ai ai = new simple_ai();
+		Neat ai = new Neat();
 		
 		//
 		
@@ -58,7 +61,8 @@ public class Controller {
 				{
 					gameboy.update();
 					// update the ai
-					ai.run();
+					//ai.run();
+					ai.GameBoy_AI_run();
 					w.draw_ai(ai);
 					state = 0;
 				}

@@ -7,118 +7,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 @SuppressWarnings("all")
-public class simple_ai {
-
-	Controller con;
-	Gameboy gameboy;
-	
-	//String state = "start";
-	ArrayList<String> tasks = new ArrayList<String>();
-	ArrayList<String> send = new ArrayList<String>();
-	
-	String[][] tiles = new String[19][18];
-	
-	int[][] game = new int[10][18];
+public class simple_ai extends GameBoy_AI{
 	
 	Goal curGoal = new Goal();
 	
-	//keep track of score
-	boolean in_game = false;
-	ArrayList<Score> scores = new ArrayList<Score>();
-	Score current_score = null;
-	
-	
-	public simple_ai(Controller con)
-	{
-		this.con = con;
-		gameboy = con.gameboy;
-	}
-	
-	
-	public void run()
-	{
-		updateTiles();
-		//String type = getScreenType();
-		
+	public void run(){
 		addTasks();
-		runTasks();
-		
-		//
-		for(String send : send)
-		{
-			con.network.sendToEmulater(send);
-		}
-		
-		tasks.clear();
-		send.clear();
 	}
 	
-	
-	void updateTiles()
+	public void addTasks()
 	{
-		WindowPanel window = con.w;
-		for(int x=0; x<19; x++)
-		{
-			for(int y=0; y<=17; y++)
-			{
-				Map cell = window.getPoint(4+x*8, 4+y*8);
-				String tile = (String) cell.get("tile");
-				tiles[x][y] = tile;
-				
-				if (x>=2 && x<=11)
-				{
-					String type = (String) cell.get("type");
-					if (!type.equals("sprite") && !tile.equals("47"))
-					{
-						game[x-2][y] = 1;
-					} else {
-						game[x-2][y] = 0;
-					}
-				}
-			}
-		}
-		
-	}
-	
-	
-	String getScreenType()
-	{
-		if (tiles[2][14].equals("89") && tiles[12][14].equals("153"))
-			return "title";
-		if (tiles[5][3].equals("16") && tiles[10][3].equals("29"))
-			return "gameType";
-		if (tiles[7][4].equals("21") && tiles[5][11].equals("29"))
-			return "levelChoose";
-		
-		if (tiles[5][4].equals("16") && tiles[14][1].equals("28"))// game over
-			return "gameOver";		
-		if (tiles[16][14].equals("47") && tiles[14][1].equals("28"))// pause
-			return "pause";
-		if (tiles[14][1].equals("28") && tiles[14][9].equals("21"))// in game 
-			return "inGame";
 
-		return "unknown";
-	}
-	
-	void addTasks()
-	{
-		if (!getScreenType().equals("inGame"))
-		{
-			menuTasks();
-			in_game = false;
-			return;
-		}
-		
-		if (in_game == false)
-		{
-			in_game = true;
-			current_score = new Score();
-			scores.add(current_score);
-		}
-		
-		current_score.level = gameboy.level;
-		current_score.lines = gameboy.lines;
-		current_score.score = gameboy.score;
+		if (!AI_running) return;
 		
 		//
 		Sprite curSpr = new Sprite();
@@ -162,59 +62,6 @@ public class simple_ai {
 			tasks.add("release_up");
 		} else {
 			tasks.add("hold_up");
-		}
-	}
-	
-	void runTasks()
-	{
-		while(tasks.size() > 0)
-		{
-			String task = tasks.remove(0);
-			switch(task)
-			{
-				case "findGoal": findGoal(new Sprite()); break;
-				case "rotate_left": send.add("press_a"); break;
-				case "rotate_right": send.add("press_b"); break;
-				case "left": send.add("press_left"); break;
-				case "right": send.add("press_right"); break;
-				case "down": send.add("press_down"); break;
-				case "enter": send.add("press_start"); break;
-
-				case "hold_rotate_left": send.add("hold_a"); break;
-				case "release_rotate_left": send.add("release_a"); break;
-
-				case "hold_rotate_right": send.add("hold_b"); break;
-				case "release_rotate_right": send.add("release_b"); break;
-				
-				case "hold_left": send.add("hold_left"); break;
-				case "release_left": send.add("release_left"); break;
-				
-				case "hold_right": send.add("hold_right"); break;
-				case "release_right": send.add("release_right"); break;
-				
-				case "hold_down": send.add("hold_down"); break;
-				case "release_down": send.add("release_down"); break;
-				
-				case "hold_up": send.add("hold_up"); break;
-				case "release_up": send.add("release_up"); break;
-				
-			}
-		}
-	}
-	
-	void menuTasks()
-	{
-		tasks.add("release_down");
-		tasks.add("release_up");
-		
-		switch(getScreenType())
-		{
-		case "title":  case "gameOver": case "pause":
-			tasks.add("enter"); break;
-		case "levelChoose": case "gameType":
-			tasks.add("left"); 
-			tasks.add("enter"); 
-			break;
 		}
 	}
 	
@@ -313,7 +160,7 @@ public class simple_ai {
 		{
 			for(int y=0; y<18; y++)
 			{
-				newGame[x][y] = game[x][y];
+				newGame[x][y] = gameboy.game[x][y];
 			}
 		}
 		
@@ -461,7 +308,7 @@ public class simple_ai {
 	}
 
 	// 
-	void draw(Graphics2D g)
+	public void draw(Graphics2D g)
 	{
 		//g.setColor(Color.BLACK);
 		
@@ -571,7 +418,7 @@ public class simple_ai {
 		
 		Sprite()
 		{
-			WindowPanel window = con.w;
+			WindowPanel window = controller.w;
 			
 			// find the sprite
 			int sp_x = 5000;
@@ -637,7 +484,7 @@ public class simple_ai {
 		//
 		void setTheSprite()
 		{
-			WindowPanel window = con.w;
+			WindowPanel window = controller.w;
 			// copy the sprite over to rot0
 			for(int ax=0; ax<4; ax++)
 			{
