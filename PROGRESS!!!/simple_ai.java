@@ -296,12 +296,12 @@ public class simple_ai extends GameBoy_AI{
 		// calculate the score
 		//////////////////////////////
 		
-		score += number_of_filled_rows;
-		score -= number_of_new_holes*10;
-		score -= number_of_cells_from_worldBottom_to_spriteTop*3;
+		//score -= number_of_filled_rows;
+		//score += number_of_new_holes*10;
+		score += number_of_cells_from_worldBottom_to_spriteTop*3;
 		
 		// a slight pull to the sides
-		score -= Math.min(number_of_cells_from_worldLeft_to_spriteLeft,number_of_cells_from_worldRight_to_spriteRight);
+		score += Math.min(number_of_cells_from_worldLeft_to_spriteLeft,number_of_cells_from_worldRight_to_spriteRight);
 				
 		
 		return score;

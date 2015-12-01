@@ -18,7 +18,7 @@ public abstract class GameBoy_AI {
 		if(!inGame) {
 			menuTasks();
 		}
-		
+
 		run();
 		
 		AI_running = inGame;

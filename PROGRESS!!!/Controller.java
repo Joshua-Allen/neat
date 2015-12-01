@@ -25,8 +25,8 @@ public class Controller {
 		GameBoy_AI.gameboy = gameboy;
 		
 		//
-		//simple_ai ai = new simple_ai();
-		Neat ai = new Neat();
+		simple_ai ai1 = new simple_ai();
+		Neat ai2 = new Neat();
 		
 		//
 		
@@ -61,9 +61,10 @@ public class Controller {
 				{
 					gameboy.update();
 					// update the ai
-					//ai.run();
-					ai.GameBoy_AI_run();
-					w.draw_ai(ai);
+					ai2.GameBoy_AI_run();
+					ai1.GameBoy_AI_run();
+
+					w.draw_ai(ai2);
 					state = 0;
 				}
 				
