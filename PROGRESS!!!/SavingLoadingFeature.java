@@ -25,7 +25,7 @@ public class SavingLoadingFeature {
 			ObjectInputStream load = new ObjectInputStream(loadFile);
 			
 			neat = (Neat) load.readObject();
-			
+			neat.resetTime();
 			load.close();
 		} catch(Exception exc) {
 			exc.printStackTrace();

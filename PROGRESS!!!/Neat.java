@@ -126,7 +126,7 @@ public class Neat extends GameBoy_AI implements Serializable{
         	while (fitnessAlreadyMeasured()){
                 nextGenome();
                 if (pool.generation > 10000) {
-                	controller.Neat_ai = new Neat();
+                	controller.ai = new Neat();
                 	break;
                 }
         	}
@@ -1141,6 +1141,11 @@ public class Neat extends GameBoy_AI implements Serializable{
 		//forms.settext(maxFitnessLabel, "Max Fitness: " .. math.floor(pool.maxFitness))
 		initializeRun();
 		pool.currentFrame++;
+	}
+	
+	//used by the load feature to reset the time
+	public void resetTime() {
+		timeFitness = System.currentTimeMillis()/1000;
 	}
 	
 	///////////////////////////////////////////////////////////////

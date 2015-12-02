@@ -15,7 +15,7 @@ public class Controller {
 	int state = 0;
 	int timer = 0;
 	
-	Neat Neat_ai;
+	GameBoy_AI ai;
 	
 	public Controller()
 	{
@@ -33,7 +33,7 @@ public class Controller {
 		//
 		//simple_ai ai1 = new simple_ai();
 		
-		Neat_ai = new Neat();
+		ai = new Neat();
 		
 		//
 		
@@ -58,7 +58,7 @@ public class Controller {
 			
 			gameboy.update();
 			// update the ai
-			Neat_ai.GameBoy_AI_run();
+			ai.GameBoy_AI_run();
 			
 			if (timer >= 2)
 			{
@@ -66,7 +66,7 @@ public class Controller {
 				timer = 0;
 			}
 
-			w.draw_ai(Neat_ai);
+			w.draw_ai(ai);
 			/*
 			if (state == 0)
 				{
@@ -111,20 +111,26 @@ public class Controller {
 	}
 	
 	public void saveNeat() {
-		if(!SavingLoadingFeature.saveNeat(NEAT_SAVE_LOAD_FILE, Neat_ai))
-				System.out.println("Neat did not save"); 
+		if(!ai.getClass().equals(Neat.class)) {
+			System.out.println("Cannot Save! AI is not Neat");
+			return;
+		}
+		if(!SavingLoadingFeature.saveNeat(NEAT_SAVE_LOAD_FILE, (Neat)ai))
+			System.out.println("Neat did not save"); 
+		else
+			System.out.println("Neat saved"); 
 	}
 	
 	public void loadNeat() {
-		Neat_ai = SavingLoadingFeature.loadNeat(NEAT_SAVE_LOAD_FILE);
+		ai = SavingLoadingFeature.loadNeat(NEAT_SAVE_LOAD_FILE);
 	}
 	
 	public void newNeat() {
-		Neat_ai = new Neat();
+		ai = new Neat();
 	}
 	
 	public void newSimpleAI() {
-		
+		ai = new simple_ai();
 	}
 	
 	public static void main(String[] args)
