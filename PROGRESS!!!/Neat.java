@@ -1,5 +1,6 @@
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.io.Serializable;
 import java.security.KeyStore.Entry;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,18 +9,23 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 
 import javax.swing.SpringLayout.Constraints;
 
 @SuppressWarnings("all")
-public class Neat extends GameBoy_AI{
+public class Neat extends GameBoy_AI implements Serializable{
 	String[] ButtonNames = { "A", "B", "Up", "Down", "Left", "Right"};
 	
 	Random random; //needed through project, especially in mutate methods
 	Pool pool; //needed in nodeMutate method to access the newInnovation method
 	Inputs inputs; // TODO value should not be 0. needed in linkMutate and randomNeuron methods
 	Outputs outputs; // TODO value should not be 0. needed in randomNeuron method at least
+
+	int cell_size = 10;
+	
+	long timeFitness = System.currentTimeMillis()/1000;
 	
 	int Population = 10;
 	double DeltaDisjoint = 2.0;
@@ -59,8 +65,14 @@ public class Neat extends GameBoy_AI{
 
 	///////////////////////////////////////////////////////////////
 	
+	public int getScore()
+	{
+		return (int)(System.currentTimeMillis()/1000 - timeFitness);
+	}
+	
 	public void run()
 	{
+		//System.out.println("run ------------------------------------------------");
 		//addTasks();
 		
 		//
@@ -72,9 +84,39 @@ public class Neat extends GameBoy_AI{
         //
         int fitness = getScore();
         
+        boolean gameOver = (!inGame && AI_running);
+        boolean nextRun = true;
+        
+        if (inGame && AI_running){
+
+	        for(java.util.Map.Entry<Integer, Neuron> n : genome.network.neurons.entrySet())
+			{
+	        	Neuron cur_neuron = n.getValue();
+	        	for(int j=0; j<cur_neuron.incoming.size(); j++){
+	        		Gene incoming = cur_neuron.incoming.get(j);
+	        		if (incoming.into < inputs.inputSize)
+	        		{
+		        		nextRun = false;
+		        		break;
+	        		}
+	        	}
+	        	for(int j=0; j<cur_neuron.incoming.size(); j++){
+	        		Gene incoming = cur_neuron.incoming.get(j);
+	        		if (incoming.into < inputs.inputSize)
+	        		{
+		        		nextRun = false;
+		        		break;
+	        		}
+	        	}
+			}
+        } else {
+        	nextRun = false;
+        }
+        
         // need to look for when the game is over
-        if (!inGame && AI_running){ //TODO could be the prob
-        	genome.fitness = fitness;
+        if (gameOver || nextRun){ //TODO could be the prob
+        	
+        	genome.fitness = fitness;//(int) ((System.currentTimeMillis()%1000) - timeFitness);
         	if (fitness > pool.maxFitness){
         		pool.maxFitness = fitness;
         	}
@@ -83,24 +125,29 @@ public class Neat extends GameBoy_AI{
         	
         	while (fitnessAlreadyMeasured()){
                 nextGenome();
+                if (pool.generation > 10000) {
+                	controller.Neat_ai = new Neat();
+                	break;
+                }
         	}
         	
         	initializeRun();
+        	timeFitness = System.currentTimeMillis()/1000;
         }
-
+        
         addTasks();
 
         
         pool.currentFrame++;
-        
+        //System.out.println("run.stop");
 	}
 	
 	// need to do
  	public void draw(Graphics2D g)
 	{
+ 		//System.out.println("draw");
  		int draw_x = 500;
  		int draw_y = 15;
- 		int cell_size = 10;
  		
  		// find the network to draw
  		Species species = pool.species.get(pool.currentSpecies);
@@ -113,12 +160,12 @@ public class Neat extends GameBoy_AI{
  		// get all the cells from the screen
  		int neuron_index = 0;
  		for(int x=0; x<10; x++){
- 	 		for(int y=0; y<18; y++){
+ 			for(int y=0; y<18; y++){
  	 			Cell cell = new Cell();
  	 			cell.x = x*cell_size;
  	 			cell.y = y*cell_size;
  	 			//if(y==0)
- 	 			//	System.out.println("cell x: " + cell.x + " cell y: " + cell.y);
+ 	 			//	////System.out.println("cell x: " + cell.x + " cell y: " + cell.y);
  	 			cell.value = network.neurons.get(neuron_index).value;
  	 			neuron_index++;
  	 			cells.put(neuron_index, cell);
@@ -154,8 +201,8 @@ public class Neat extends GameBoy_AI{
  			if (n.getKey() > inputs.inputSize && n.getKey() <= MaxNodes)
 			{
 	 			Cell cell = new Cell();
-	 			cell.x = 140;
-	 			cell.y = 40;
+	 			cell.x = 400;
+	 			cell.y = 0;
 	 			cell.value = neuron.value;
 	 			cells.put(n.getKey(), cell);
 			}
@@ -163,6 +210,7 @@ public class Neat extends GameBoy_AI{
  		
  		// fix all the placements of the cells
  		int boxRight = cell_size*10;
+ 		
  		
  		for(int r=0; r<4; r++){// jus  repeat 4 times
  			for(Gene gene: genome.genes){
@@ -179,9 +227,9 @@ public class Neat extends GameBoy_AI{
                         
                         into.y = (int) (0.75*into.y + 0.25*into.y);
  					}
- 					if(out == null || into == null)
- 		 				System.out.println("out: " + out + "   into:  " + into);
- 		 			else if (gene.out > inputs.inputSize && gene.out <= MaxNodes){
+ 					if(out == null || into == null){
+ 		 				////System.out.println("out: " + out + "   into:  " + into);
+ 					}else if (gene.out > inputs.inputSize && gene.out <= MaxNodes){
  						out.x = (int) (0.25*into.x + 0.75*out.x);
  						
                         if (into.x >= out.x) out.x = out.x + 40;
@@ -204,17 +252,20 @@ public class Neat extends GameBoy_AI{
  		for(java.util.Map.Entry<Integer, Cell> n : cells.entrySet())
  		{
  			Cell cell = n.getValue();
-			//System.out.println("n = " + n);
-			if(cell == null)
- 				System.out.println("draw - " + n + " " + network.neurons.size());
- 			else //if (n > inputs.inputSize || cell.value != 0)
+ 			 
+			//////System.out.println("n = " + n);
+			if(cell == null){
+ 				////System.out.println("draw - " + n + " " + network.neurons.size());
+			}else //if (n > inputs.inputSize || cell.value != 0)
  			{
  				
- 				int alpha = 255;
+ 				int alpha = 20;
  				if (cell.value == 0) alpha = 20;
  				
  				drawBox(g, draw_x+cell.x, draw_y+cell.y, cell_size, cell_size, Color.white, new Color(255,255,255,alpha));
  			}
+			g.setColor(Color.BLACK);
+			g.drawString(""+(cell.value), draw_x+cell.x+5, draw_y+cell.y+10);
  		}
  		g.setColor(Color.BLACK);
  		// draw the connecting lines
@@ -223,9 +274,9 @@ public class Neat extends GameBoy_AI{
  				Cell into = cells.get(gene.into);
 				Cell out = cells.get(gene.out);
 				
-				if(out == null || into == null)
-		 			System.out.println("line - out: " + out + "    into - " + into);
-		 		else g.drawLine(draw_x+into.x+cell_size/2, draw_y+into.y+cell_size/2, draw_x+out.x+cell_size/2, draw_y+out.y+cell_size/2);
+				if(out == null || into == null){
+		 			////System.out.println("line - out: " + out + "    into - " + into);
+				}else g.drawLine(draw_x+into.x+cell_size/2, draw_y+into.y+cell_size/2, draw_x+out.x+cell_size/2, draw_y+out.y+cell_size/2);
  			}
  		}
  		
@@ -261,31 +312,56 @@ public class Neat extends GameBoy_AI{
  		
  		g.setColor(Color.BLACK);
  		draw_text(g, poolInfo, 330, 5);
- 		
+ 		//System.out.println("draw.stop");
 	}
  	
  	// draw helpers
  	void draw_text(Graphics2D g, String text, int x, int y) {
+ 		//System.out.println("draw_text");
  	    for (String line : text.split("\n"))
  	        g.drawString(line, x, y += g.getFontMetrics().getHeight());
+ 	   //System.out.println("draw_text.stop");
  	}
  	void drawBox(Graphics2D g, int x, int y, int width, int height, Color in, Color out)
  	{
+ 		//System.out.println("drawBox");
  		g.setColor(in);
  		g.fillRect(x, y, width, height); 	
  		g.setColor(out);
  		g.drawRect(x, y, width, height);
+ 		//System.out.println("drawBox.stop");
  	}
  	
 	///////////////////////////////////////////////////////////////
  	
 	public void addTasks()
 	{
-		//System.out.println("test");
+ 		Species species = pool.species.get(pool.currentSpecies);
+ 		Genome genome = species.genomes.get(pool.currentGenome);
+ 		Network network = genome.network;
+ 		
+		double A = network.neurons.get(MaxNodes+0).value;
+		double B = network.neurons.get(MaxNodes+1).value;
+		double UP = network.neurons.get(MaxNodes+2).value;
+		double DOWN = network.neurons.get(MaxNodes+3).value;
+		double LEFT = network.neurons.get(MaxNodes+4).value;
+		double RIGHT = network.neurons.get(MaxNodes+5).value;
+		
+		
+		if (A > 0){tasks.add("rotate_left");}
+		if (B > 0){tasks.add("rotate_right");}
+		//if (UP > 0){tasks.add("UP");}
+		if (DOWN > 0){tasks.add("hold_down");}else{tasks.add("release_down");}
+		if (LEFT > 0){tasks.add("hold_left");}else{tasks.add("release_left");}
+		if (RIGHT > 0){tasks.add("hold_right");}else{tasks.add("release_right");}
+		
+		
+		
+		//////System.out.println("test");
 		//int i=0;
 		//for(;;)	{ i++; }
 
-		//System.out.println("test");
+		//////System.out.println("test");
 		//return;
 		/*
 		if (outputs.getKey("a")){tasks.add("rotate_left");}
@@ -299,25 +375,32 @@ public class Neat extends GameBoy_AI{
 	///////////////////////////////////////////////////////////////
  	
 	
+	
 	///////////////////////////////////////////////////////////////
  	public Inputs getInputs()
  	{
+ 		//System.out.println("getInputs");
  		WindowPanel window = controller.w;
  		
  		Inputs inputs = new Inputs();
  		//inputs.inputs.add()
- 		
- 		for(int y=0; y<18; y++)
+ 		for(int x=0; x<10; x++)
  		{
- 	 		for(int x=0; x<20; x++)
+ 	 		for(int y=0; y<18; y++)
  	 		{
-				Map cell = window.getPoint(4+x*8, 4+y*8);
-				String tile = (String) cell.get("tile");
+				//Map cell = window.getPoint(4+x*8, 4+y*8);
+				//String tile = (String) cell.get("tile");
+ 	 			String tile = ""+ gameboy.game_tiles[x][y];
 				if (tile != null)
-				inputs.inputs.add(Integer.parseInt(tile));
+				{
+					inputs.inputs.add(Integer.parseInt(tile));
+				}
  	 		}
  		}
  		
+ 		//////System.out.println(inputs.inputs.size());
+ 		
+ 		//System.out.println("getInputs.stop");
  		return inputs;
  	}
  	
@@ -342,38 +425,43 @@ public class Neat extends GameBoy_AI{
 
 	public Outputs evaluateNetwork(Network network, Inputs inputs_in)
 	{
-		// 
-		
-		
-		//System.out.println("size: " + inputs.inputs.size());
-		for(int i=0; i<inputs.inputs.size(); i++)
+		//System.out.println("evaluateNetwork");
+		for(int i=0; i<inputs.inputSize; i++)
 		{
-			//network.neurons[i].value = (double) ((Integer) inputs.inputs.get(i)).intValue();
-			//System.out.println("index: " + i);
 			network.neurons.get(i).value = (double) ((Integer) inputs_in.inputs.get(i)).intValue();
 		}
 		
 		//
-		for(int i=0; i<network.neurons.size(); i++)
+		//for(int i=0; i<network.neurons.size(); i++)
+		for(java.util.Map.Entry<Integer, Neuron> n : network.neurons.entrySet())
 		{
-			Neuron cur_neuron = network.neurons.get(i);
-			if (cur_neuron != null)
+			//Neuron cur_neuron = network.neurons.get(i);
+			Neuron cur_neuron = n.getValue();
+			
+
+			
+			double sum = 0;
+			
+			
+			for(int j=0; j<cur_neuron.incoming.size(); j++){
+				if (cur_neuron.value != 0)
+					System.out.println(cur_neuron.value);
+				Gene incoming = cur_neuron.incoming.get(j);
+				//Neuron other = network.neurons[incoming.into];
+				Neuron other = network.neurons.get(incoming.into);
+				sum += incoming.weight * other.value;
+				
+
+			}
+			
+			if (cur_neuron.incoming.size() > 0)
 			{
-				int sum = 0;
-				
-				//System.out.println(cur_neuron);
-				for(int j=0; j<cur_neuron.incoming.size(); j++){
-					Gene incoming = cur_neuron.incoming.get(j);
-					//Neuron other = network.neurons[incoming.into];
-					Neuron other = network.neurons.get(incoming.into);
-					
-					sum += incoming.weight * other.value;
-				}
-				
-				if (cur_neuron.incoming.size() > 0)
-				{
-					cur_neuron.value = sigmoid(sum);
-				}
+				double sig = sigmoid(sum);
+				if (cur_neuron.value != 0)
+					System.out.println("value: "+cur_neuron.value+
+							"    sum: "+ sum+
+							"    sigmoid: "+ sig);				
+				cur_neuron.value = sig;
 			}
 		}
 		
@@ -382,7 +470,9 @@ public class Neat extends GameBoy_AI{
 		
         for (int i=0; i<6; i++) 
         {
-        	//if (network.neurons[MaxNodes+i].value > 0)
+        	if (network.neurons.get(MaxNodes+i).value != 0)
+        	System.out.println("Outputs_"+i+":  " + network.neurons.get(MaxNodes+i).value);
+        	
         	if (network.neurons.get(MaxNodes+i).value > 0)
         	{
         		out.outputs[i] = true;
@@ -390,12 +480,15 @@ public class Neat extends GameBoy_AI{
         		out.outputs[i] = false;
         	}
         }
-		
+		//System.out.println("evaluateNetwork.stop");
+
 		return out;
 	}
 
 	public Genome crossover(Genome g1, Genome g2)
 	{
+		//System.out.println("crossover");
+
 		//
 		Genome genome1 = g1;
 		Genome genome2 = g2;
@@ -447,6 +540,8 @@ public class Neat extends GameBoy_AI{
 		
 		
 		//
+		//System.out.println("crossover.stop");
+
 		return child;
 	}
 	
@@ -477,27 +572,33 @@ public class Neat extends GameBoy_AI{
 				indexes.add(i);
 		
 		return indexes.get(random.nextInt(indexes.size()));*/
+		//System.out.println("randomNeuron");
+
 		ArrayList<Integer> indexes = new ArrayList<Integer>();
-		if(!nonInput) 
-			for(int i=0; i<inputs.inputs.size(); i++) 
+		//if(!nonInput) 
+			for(int i=0; i<inputs.inputSize; i++) 
 				indexes.add(i);
 		for(int o=0; o<outputs.outputs.length; o++)
 			indexes.add(MaxNodes+o);
 		for(int i=0; i<genes.size(); i++) {
-			if(!nonInput || genes.get(i).into > inputs.inputs.size())
+			if(!nonInput || genes.get(i).into > inputs.inputSize)
 				indexes.add(genes.get(i).into);
-			if(!nonInput || genes.get(i).out > inputs.inputs.size())
+			if(!nonInput || genes.get(i).out > inputs.inputSize)
 				indexes.add(genes.get(i).out);
 		}
+		//System.out.println("randomNeuron.stop");
+
 		return indexes.get(random.nextInt(indexes.size()));
 	}
 	
 	///////////////////////////////////////////////////////////////
 	public void mutate(Genome genome)
 	{
+		//System.out.println("mutate");
+
 		double p; 
 		
-		genome.connections *= (random.nextDouble() > 0.5) ? 0.95 : 1.05263;
+		genome.connections *= (random.nextDouble() > .5) ? 0.95 : 1.05263;
 		genome.link *= (random.nextDouble() > 0.5) ? 0.95 : 1.05263;
 		genome.bias *= (random.nextDouble() > 0.5) ? 0.95 : 1.05263;
 		genome.node *= (random.nextDouble() > 0.5) ? 0.95 : 1.05263;
@@ -542,9 +643,13 @@ public class Neat extends GameBoy_AI{
 				enableDisableMutate(genome, false);
 			p--;
 		}
+		//System.out.println("mutate.stop");
+
 	}
 	public void pointMutate(Genome genome)
 	{
+		//System.out.println("pointMutate");
+
 		double step = genome.step;
 		Gene gene = null;
 		for(int i=0; i < genome.genes.size(); i++) {
@@ -554,17 +659,21 @@ public class Neat extends GameBoy_AI{
 			else 
 				gene.weight = random.nextDouble() * 4 - 2;//TODO Ditto 
 		}
+		//System.out.println("pointMutate.stop");
+
 	}
 	public void linkMutate(Genome genome, boolean forceBias)
 	{
-		int neuron1 = randomNeuron(genome.genes, false);
-		int neuron2 = randomNeuron(genome.genes, true);
+		//System.out.println("linkMutate");
+
+		int neuron1 = randomNeuron(genome.genes, true);
+		int neuron2 = randomNeuron(genome.genes, false);
 		
 		Gene newLink = new Gene();
-		if(neuron1 <= inputs.inputs.size() && neuron2 <= inputs.inputs.size()) 
+		if(neuron1 < inputs.inputSize && neuron2 < inputs.inputSize) 
 			return;
 		
-		if(neuron2 <= inputs.inputs.size()) {
+		if(neuron2 < inputs.inputSize) {
 			//Swap output and input
 			int temp = neuron1;
 			neuron1 = neuron2;
@@ -573,8 +682,8 @@ public class Neat extends GameBoy_AI{
 		
 		newLink.into = neuron1;
 		newLink.out = neuron2;
-		if(forceBias)
-			newLink.into = inputs.inputs.size();
+		//if(forceBias)
+			//newLink.into = inputs.inputSize-1;
 		
 		if(genome.genes.contains(newLink)) //TODO test if we need custom contains method
 			return;
@@ -583,10 +692,14 @@ public class Neat extends GameBoy_AI{
 		newLink.weight = random.nextDouble() * 4 - 2; //TODO check if execution order is correct
 		
 		genome.genes.add(newLink);
+		//System.out.println("linkMutatestop");
+
 	}
 	
 	public void nodeMutate(Genome genome)
 	{
+		//System.out.println("nodeMutate");
+
 		if (genome.genes.size() == 0)
 			return;
 		
@@ -609,9 +722,13 @@ public class Neat extends GameBoy_AI{
 		gene2.innovation = pool.newInnovation();
 		gene2.enabled = true; 
 		genome.genes.add(gene2);
+		//System.out.println("nodeMutatestop");
+
 	}
 	public void enableDisableMutate(Genome genome, boolean enable)
 	{
+		//System.out.println("enableDisableMutate");
+
 		ArrayList<Gene> candidates = new ArrayList<Gene>();
 		for(Gene gene : genome.genes)
 			if (!gene.enabled)
@@ -620,11 +737,15 @@ public class Neat extends GameBoy_AI{
 			return;
 		Gene gene = candidates.get(random.nextInt(candidates.size())); //TODO maybe off by one error, must test
 		gene.enabled = !gene.enabled;
+		//System.out.println("enableDisableMutate.stop");
+
 	}
 	
 	///////////////////////////////////////////////////////////////
 	
 	public double disjoint(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
+		//System.out.println("disjoint");
+
 		int disjointGenes = 0;
 		
 		
@@ -647,11 +768,15 @@ public class Neat extends GameBoy_AI{
 		
 		int n = Math.max(genes1.size(), genes2.size());
 		if (n == 0) n = 1;
+		//System.out.println("disjointStop");
+
 		return disjointGenes / n;
 	}
 	
 	
 	public double weights(ArrayList<Gene> genes1, ArrayList<Gene> genes2) {
+		//System.out.println("weights");
+
 		ArrayList<Gene> genes = new ArrayList<Gene>();
 		ArrayList<Integer> indexes = new ArrayList<Integer>();
 		
@@ -671,7 +796,8 @@ public class Neat extends GameBoy_AI{
 				coincident++;
 			}
 		}
-		
+		//System.out.println("weightsStop");
+
 		return sum / coincident;
 	}
 	
@@ -682,6 +808,8 @@ public class Neat extends GameBoy_AI{
 	}
 	
 	public void rankGlobally() {
+		////System.out.println("rankGlobally");
+
 		ArrayList<Genome> global = new ArrayList<>();
 		for(int s=0; s<pool.species.size(); s++) {
 			Species species = pool.species.get(s);
@@ -693,10 +821,14 @@ public class Neat extends GameBoy_AI{
 		
 		for(int g=0; g<global.size(); g++) 
 			global.get(g).globalRank = g;
+		////System.out.println("rankGloballyStop");
+
 	}
 	
 	public void calculateAverageFitness(Species species)
 	{
+		////System.out.println("calculateAverageFitness");
+
 		int total = 0;
 		
 		for(Genome gen: species.genomes)
@@ -705,22 +837,30 @@ public class Neat extends GameBoy_AI{
 		}
 		
 		species.averageFitness = total / species.genomes.size();
+		////System.out.println("calculateAverageFitnessStop");
+
 	}
 	
 	public int totalAverageFitness()
 	{
+		////System.out.println("totalAverageFitness");
+
 		int total = 0;
 		
 		for(Species species: pool.species)
 		{
 			total += species.averageFitness;
 		}
-		
+		////System.out.println("totalAverageFitnessStop");
+
 		return total;
+
 	}
 	
 	public void cullSpecies(boolean cutToOne)
 	{
+		////System.out.println("cullSpecies");
+
 		for(Species species: pool.species)
 		{
 			species.sort();
@@ -737,10 +877,14 @@ public class Neat extends GameBoy_AI{
 				species.genomes.remove(species.genomes.size()-1);
 			}
 		}
+		////System.out.println("cullSpeciesStop");
+
 	}
 	
 	public Genome breedChild(Species species)
 	{
+		//System.out.println("breedChild");
+
 		Genome child;
 		
 		if (random.nextDouble() < CrossoverChance)
@@ -754,12 +898,15 @@ public class Neat extends GameBoy_AI{
 		}
 		
 		mutate(child);
-		
+		//System.out.println("breedChildStp");
+
 		return child;
 	}
 	
 	public void removeStaleSpecies()
 	{
+		////System.out.println("removeStaleSpecies");
+
 		ArrayList<Species> survived = new ArrayList<Species>();
 		
 		for(Species species: pool.species)
@@ -784,34 +931,40 @@ public class Neat extends GameBoy_AI{
 		}
 		
 		pool.species = survived;
-		
+		////System.out.println("removeStaleSpeciesStop");
+
 	}
 	
 	public void removeWeakSpecies()
 	{
+		////System.out.println("removeWeakSpecies");
+
 		ArrayList<Species> survived = new ArrayList<Species>();
 		
 		int sum = totalAverageFitness();
-		System.out.println("r sum: " + sum);///////////
+		////System.out.println("r sum: " + sum);///////////
 		
 		for(Species species: pool.species)
 		{
-            System.out.println("Population: " + Population);///////////
+            //////System.out.println("Population: " + Population);///////////
             double breed = Math.floor(species.averageFitness / (sum==0 ? 1 : sum) * Population);
-            System.out.println("averageFitness: " + species.averageFitness + "   breed: " + breed);///////////
+            //////System.out.println("averageFitness: " + species.averageFitness + "   breed: " + breed);///////////
             if (breed >= 0) {
-            	System.out.println("r breed >= 1: " + breed);///////////
+            	////System.out.println("r breed >= 1: " + breed);///////////
             	survived.add(species);
             }
 		}
 		pool.species = survived;
-		
-		System.out.println("r pool.species.size(): " + pool.species.size());///////////
+		////System.out.println("removeWeakSpeciesStop");
+
+		//////System.out.println("r pool.species.size(): " + pool.species.size());///////////
 	}
 	
 	///////////////////////////////////////////////////////////////
 	public void addToSpecies(Genome child)
 	{
+		//System.out.println("addToSpecies");
+
 		boolean foundSpecies = false;
 		for(Species species: pool.species)
 		{
@@ -828,11 +981,14 @@ public class Neat extends GameBoy_AI{
 			sp.genomes.add(child);
 			pool.species.add(sp);
 		}
+		//System.out.println("addToSpeciesStop");
+
 	}
 	
 	public void newGeneration()
 	{
-		
+		////System.out.println("newGeneration");
+
 		cullSpecies(false);
 		rankGlobally();
 		removeStaleSpecies();
@@ -850,7 +1006,7 @@ public class Neat extends GameBoy_AI{
 		
 		for(Species species: pool.species)
 		{
-			System.out.println("Population: " + Population);
+			//////System.out.println("Population: " + Population);
 			double breed = Math.floor(species.averageFitness / (sum==0 ? 1 : sum) * Population) - 1;
 			for(int i=0; i<breed; i++)
 			{
@@ -861,14 +1017,14 @@ public class Neat extends GameBoy_AI{
 		
 		cullSpecies(true);
 		
-		System.out.println("4 pool.species.size(): " +pool.species.size());///////////
+		////System.out.println("4 pool.species.size(): " +pool.species.size());///////////
 		
 		while(children.size()+pool.species.size() < Population)
 		{
 			int rInt = 0;
 			if (pool.species.size() > 0) rInt = random.nextInt(pool.species.size());
 			
-			//System.out.println("size: "+ pool.species.size() +" - " + rInt);
+			//////System.out.println("size: "+ pool.species.size() +" - " + rInt);
 			Species species = null;
 			species = pool.species.get(rInt);
 			children.add(breedChild(species));
@@ -880,10 +1036,14 @@ public class Neat extends GameBoy_AI{
 		}
 		
 		pool.generation++;
+		////System.out.println("newGenerationStop");
+
 	}
 	
 	public void initializePool()
 	{
+		//System.out.println("initializePool");
+
 		pool = new Pool();
 		
 		for(int i=0; i<Population; i++)
@@ -891,15 +1051,22 @@ public class Neat extends GameBoy_AI{
 			addToSpecies(basicGenome());
 		}
 		initializeRun();
+		//System.out.println("initializePoolStop");
+
 	}
 	
 	public void initializeRun()
 	{
+		//System.out.println("initializeRun");
+
 		// TODO: send load game command
 		Species species = pool.species.get(pool.currentSpecies);
 		Genome genome = species.genomes.get(pool.currentGenome);
 		generateNetwork(genome);
 		evaluateCurrent();
+		
+		//System.out.println("initializeRunStop");
+
 	}
 	
 	public void evaluateCurrent()
@@ -907,7 +1074,7 @@ public class Neat extends GameBoy_AI{
 		Species species = pool.species.get(pool.currentSpecies);
 		Genome genome = species.genomes.get(pool.currentGenome);
 		
-		Inputs inputs = getInputs();
+		inputs = getInputs();
 		Outputs controller = evaluateNetwork(genome.network, inputs);
 		//TODO: joypad.set(controller)
 	}
@@ -977,13 +1144,15 @@ public class Neat extends GameBoy_AI{
 	}
 	
 	///////////////////////////////////////////////////////////////
-	public class Network{
+	public class Network implements Serializable {
 		HashMap<Integer, Neuron> neurons;// = new HashMap<Integer, String>();
 		//Neuron[] neurons = new Neuron[50];
 		//neurons
 		
 		public Network(Genome genome, int inputNumber, int outputNumber)
 		{
+
+			//System.out.println("Network");
 
 			//neurons = new Neuron[MaxNodes+outputNumber];
 			neurons = new HashMap<Integer, Neuron>();
@@ -1019,9 +1188,11 @@ public class Neat extends GameBoy_AI{
 			}
 			
 			genome.network = this;
+			//System.out.println("NetworkSTOP!!!");
+
 		}
 	}
-	public class Pool{
+	public class Pool implements Serializable {
 		ArrayList<Species> species = new ArrayList<Species>();
         int generation = 0;
         int innovation = 0;
@@ -1035,7 +1206,7 @@ public class Neat extends GameBoy_AI{
 			return ++innovation;
 		}
 	}
-	public class Species{
+	public class Species implements Serializable {
 		ArrayList<Genome> genomes = new ArrayList<Genome>();
 		int topFitness = 0;
 		int staleness = 0;
@@ -1055,7 +1226,7 @@ public class Neat extends GameBoy_AI{
 			averageFitness = total / genomes.size();
 		}
 	}
-	public class Genome implements Comparable{
+	public class Genome implements Comparable , Serializable {
 		ArrayList<Gene> genes = new ArrayList<Gene>();
 		Network network;
 		int fitness = 0;
@@ -1106,7 +1277,7 @@ public class Neat extends GameBoy_AI{
 			return Double.compare(this.fitness, otherFitness);
 		}
 	}
-	public class Gene implements Comparable{
+	public class Gene implements Comparable , Serializable {
 		int into = 0;
 		int out = 0;
 		double weight = 0.0;
@@ -1133,18 +1304,18 @@ public class Neat extends GameBoy_AI{
 			return this.out-otherOut;
 		}
 	}
-	public class Neuron{
+	public class Neuron implements Serializable {
 		ArrayList<Gene> incoming = new ArrayList<Gene>();
 		double value = 0.0;
 	}
 	
-	public class Inputs{
+	public class Inputs implements Serializable {
 		public ArrayList inputs = new ArrayList();
 		
-		int inputSize = 11*19;
+		int inputSize = 10*18;
 		
 	}
-	public class Outputs{
+	public class Outputs implements Serializable {
 		//"A","B","Up","Down","Left","Right"
 		boolean[] outputs = {false, false, false, false, false, false};
 		public boolean getKey(String key)
@@ -1189,7 +1360,7 @@ public class Neat extends GameBoy_AI{
 	
 
 	// for drawing
-	public class Cell{
+	public class Cell implements Serializable {
 		public int x = 0;
 		public int y = 0;
 		public double value = 0;

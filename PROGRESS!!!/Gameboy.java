@@ -9,6 +9,7 @@ public class Gameboy {
 	
 	String[][] tiles = new String[19][18];
 	int[][] game = new int[10][18];
+	int[][] game_tiles = new int[10][18];
 	
 	public int score = 0;
 	public int level = 0;
@@ -91,6 +92,19 @@ public class Gameboy {
 					} else {
 						game[x-2][y] = 0;
 					}
+
+					
+					if (!tile.equals("47"))
+					{
+						if (!type.equals("sprite"))
+						{
+							game_tiles[x-2][y] = -1;
+						} else {
+							game_tiles[x-2][y] = 1;
+						}
+					} else {
+						game_tiles[x-2][y] = 0;
+					}
 				}
 			}
 		}
@@ -116,7 +130,6 @@ public class Gameboy {
 		return "unknown";
 	}
 
-	
 	
 	// analytics
 	boolean in_game = false;

@@ -3,6 +3,8 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,9 +18,11 @@ public class WindowPanel extends JPanel{
 	
 	//
 	JFrame frame;
-	
+	Controller controller;
 	//
 	public JTextArea textAreal = new JTextArea("", 50, 50);
+	
+	public JMenuBar menuBar;
 	
 	//
 	int screen_scale = 2;
@@ -61,6 +65,49 @@ public class WindowPanel extends JPanel{
 		simple_image_tile = new BufferedImage(160, 144, BufferedImage.TYPE_INT_ARGB);
 		tile_image = new BufferedImage(128, 192, BufferedImage.TYPE_INT_ARGB);
 		network_image = new BufferedImage(5000, 640, BufferedImage.TYPE_INT_ARGB);
+		
+		//Menu Bar stuff for saving and loading neat instances
+		menuBar = new JMenuBar();
+		JMenu fileMenu = new JMenu("File");
+		JMenuItem save = new JMenuItem("Save Neat");
+		JMenuItem load = new JMenuItem("Load Neat");
+		JMenuItem newNeat = new JMenuItem("New Neat");
+		JMenuItem newSimple = new JMenuItem("New Simple AI");
+		load.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				controller.loadNeat();
+			}
+		});
+		save.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				controller.saveNeat();
+			}
+		});
+		newNeat.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				controller.newNeat();
+			}
+		});
+		newSimple.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				controller.newSimpleAI();
+			}
+		});
+		fileMenu.add(save);
+		fileMenu.add(load);
+		fileMenu.add(newNeat);
+		fileMenu.add(newSimple);
+		menuBar.add(fileMenu);
+		menuBar.setVisible(true);
+		frame.setJMenuBar(menuBar);
 		
 		colors[0] = Color.WHITE.getRGB();
 		colors[1] = Color.LIGHT_GRAY.getRGB();
